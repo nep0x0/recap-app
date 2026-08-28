@@ -1,6 +1,6 @@
-# RecapApp — Timedoor Academy
+# RecapApp
 
-Aplikasi web lokal untuk mengotomasi tugas-tugas rutin guru di CMS **Timedoor Academy**:
+Aplikasi web lokal untuk mengotomasi tugas-tugas rutin guru di CMS :
 
 - 🔄 **Sync siswa** — tarik daftar siswa dari CMS ke database lokal.
 - 📊 **Rekap progres** — kumpulkan progres semua siswa (mastery, coin, lesson) menjadi satu tabel.
