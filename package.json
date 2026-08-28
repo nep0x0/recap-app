@@ -1,0 +1,17 @@
+{
+  "name": "recap-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Otomasi report siswa Timedoor Academy (lokal)",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "build": "npm run build -w client",
+    "serve": "node server/index.js",
+    "start": "npm run build && npm run serve",
+    "dev:server": "node server/index.js",
+    "dev:client": "npm run dev -w client"
+  }
+}

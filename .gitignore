@@ -1,0 +1,8 @@
+node_modules/
+server/data/
+client/dist/
+*.log
+.DS_Store
+
+# Transkrip sesi lama (bukan kode)
+session-ses_*.md

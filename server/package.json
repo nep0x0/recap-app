@@ -1,0 +1,9 @@
+{
+  "name": "recap-server",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
