@@ -7,7 +7,7 @@ Aplikasi web lokal untuk mengotomasi tugas-tugas rutin guru di CMS :
 - 📝 **Jurnal meeting** — buat draf catatan meeting dari CMS, lalu kirim otomatis ke jurnal siswa.
 - 📚 **Report blok 8 pertemuan** — pindai blok report yang belum lengkap, tandai selesai, dan buat report baru ke CMS.
 
-Server adalah **Express (Node.js)** yang menyajikan API JSON + SPA Vite/React di port yang sama. Tidak butuh layanan eksternal selain akses ke CMS Timedoor.
+Server adalah **Express (Node.js)** yang menyajikan API JSON + SPA Vite/React di port yang sama. Tidak butuh layanan eksternal selain akses ke CMS.
 
 ---
 
@@ -25,7 +25,7 @@ Dokumen ini khusus untuk **developer / teknisi** yang memasang dan menjalankan R
 
 - **Node.js ≥ 18** (disarankan 20 LTS)
 - **npm ≥ 9** (sudah termasuk saat install Node)
-- Koneksi internet ke CMS Timedoor Academy (untuk login & sinkronisasi)
+- Koneksi internet ke CMS Academy (untuk login & sinkronisasi)
 - OS: Windows / macOS / Linux
 
 ### Cara install
