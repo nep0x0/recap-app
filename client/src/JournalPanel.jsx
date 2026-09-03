@@ -12,6 +12,8 @@ function JournalPanel({ sessionValid, notify }) {
   const [selectedStudent, setSelectedStudent] = useState("");
   const [notes, setNotes] = useState({});
   const [drafts, setDrafts] = useState({});
+  const [scores, setScores] = useState({});
+  const [draftScores, setDraftScores] = useState({});
   const [selected, setSelected] = useState(new Set());
   const [studentFilter, setStudentFilter] = useState("");
   const [courseFilter, setCourseFilter] = useState("");
@@ -63,12 +65,24 @@ function JournalPanel({ sessionValid, notify }) {
   const selectedCount = useMemo(() => filtered.filter((e) => selected.has(e.key)).length, [filtered, selected]);
   const allChecked = filtered.length > 0 && selectedCount === filtered.length;
 
-  // R16: catatan mana yang sudah diubah dari draf
+  // Catatan atau nilai mana yang sudah diubah dari draf
   const isEdited = useMemo(() => {
     if (!plan) return () => false;
-    const edited = new Set(plan.entries.filter((e) => (notes[e.key] ?? "") !== (drafts[e.key] ?? "")).map((e) => e.key));
+    const edited = new Set(
+      plan.entries
+        .filter((e) => {
+          if ((notes[e.key] ?? "") !== (drafts[e.key] ?? "")) return true;
+          const curS = scores[e.key] || {};
+          const drfS = draftScores[e.key] || {};
+          for (const a of e.activities || []) {
+            if (String(curS[a.id] ?? a.score) !== String(drfS[a.id] ?? a.score)) return true;
+          }
+          return false;
+        })
+        .map((e) => e.key)
+    );
     return (key) => edited.has(key);
-  }, [plan, notes, drafts]);
+  }, [plan, notes, drafts, scores, draftScores]);
 
   const editedTotal = useMemo(() => {
     if (!plan) return 0;
@@ -94,6 +108,15 @@ function JournalPanel({ sessionValid, notify }) {
       setPlan(r);
       setNotes(Object.fromEntries(r.entries.map((e) => [e.key, e.note])));
       setDrafts(Object.fromEntries(r.entries.map((e) => [e.key, e.note])));
+      const sMap = {};
+      for (const e of r.entries) {
+        sMap[e.key] = {};
+        for (const a of e.activities || []) {
+          sMap[e.key][a.id] = a.score;
+        }
+      }
+      setScores(sMap);
+      setDraftScores(sMap);
       setSelected(new Set(r.entries.map((e) => e.key)));
       notify("ok", `Rencana jurnal dibuat — ${r.entry_count} catatan menunggu pengecekan.`);
     } catch (e) {
@@ -156,6 +179,7 @@ function JournalPanel({ sessionValid, notify }) {
 
   const restoreDraft = (key) => {
     setNotes((prev) => ({ ...prev, [key]: drafts[key] ?? "" }));
+    setScores((prev) => ({ ...prev, [key]: { ...(draftScores[key] || {}) } }));
   };
 
   const handleConfirm = async () => {
@@ -169,7 +193,14 @@ function JournalPanel({ sessionValid, notify }) {
     const list = filtered.filter((e) => selected.has(e.key));
     setConfirmBusy(true);
     try {
-      const body = list.map((e) => ({ ...e, note: notes[e.key] ?? e.note }));
+      const body = list.map((e) => ({
+        ...e,
+        note: notes[e.key] ?? e.note,
+        activities: (e.activities || []).map((a) => ({
+          ...a,
+          score: Number(scores[e.key]?.[a.id] ?? a.score ?? 85),
+        })),
+      }));
       const r = await api.journalFill(body);
       setConfirmBox(null);
       if (!r || !r.started) {
@@ -274,6 +305,37 @@ function JournalPanel({ sessionValid, notify }) {
               <input type="checkbox" checked={allChecked} onChange={(e) => toggleAll(e.target.checked)} />
               Pilih semua ({fmtNum(selectedCount)}/{fmtNum(filtered.length)})
             </label>
+            {selectedCount > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: "4px", marginLeft: "6px", flexWrap: "wrap" }}>
+                <span className="muted small" style={{ fontSize: "11px", fontWeight: 600 }}>Set Skor Terpilih:</span>
+                {[80, 85, 90, 95, 100].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    className="ghost sm"
+                    style={{ padding: "1px 6px", fontSize: "11px", height: "auto" }}
+                    title={`Set semua lesson pada ${selectedCount} catatan terpilih ke ${val}`}
+                    onClick={() => {
+                      setScores((prev) => {
+                        const next = { ...prev };
+                        for (const e of filtered) {
+                          if (selected.has(e.key)) {
+                            next[e.key] = { ...(next[e.key] || {}) };
+                            for (const a of e.activities || []) {
+                              next[e.key][a.id] = val;
+                            }
+                          }
+                        }
+                        return next;
+                      });
+                      notify("ok", `Skor ${selectedCount} catatan diset ke ${val}.`);
+                    }}
+                  >
+                    {val}
+                  </button>
+                ))}
+              </div>
+            )}
             <span className="muted small grow-right">
               {plan.entry_count} catatan tersedia · {plan.skipped_count} meeting dilewati ·{" "}
               {editedTotal > 0 ? (
@@ -336,8 +398,8 @@ function JournalPanel({ sessionValid, notify }) {
                     </div>
                     <div className="jitem-right">
                       {e.activities.map((a) => (
-                        <span key={a.id} className="mono small">
-                          {a.score}
+                        <span key={a.id} className="mono small chip" title={`${a.name || 'Lesson'}: ${scores[e.key]?.[a.id] ?? a.score}`}>
+                          {scores[e.key]?.[a.id] ?? a.score}
                         </span>
                       ))}
                       {edited && <span className="chip info edit-dot-chip">diedit</span>}
@@ -368,7 +430,7 @@ function JournalPanel({ sessionValid, notify }) {
                   </div>
                   <textarea
                     className="jnote"
-                    rows={6}
+                    rows={4}
                     value={notes[editEntry.key] ?? editEntry.note}
                     onChange={(ev) => setNotes((prev) => ({ ...prev, [editEntry.key]: ev.target.value }))}
                     aria-label={`Catatan ${editEntry.meeting_name}`}
@@ -380,6 +442,80 @@ function JournalPanel({ sessionValid, notify }) {
                         Kembalikan ke draf
                       </button>
                     )}
+                  </div>
+
+                  <div className="jedit-scores" style={{ marginTop: "12px", borderTop: "1px solid var(--line)", paddingTop: "10px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+                      <b className="small">Nilai Lesson ({editEntry.activities?.length || 0}):</b>
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <span className="muted small" style={{ fontSize: "11px" }}>Set Semua:</span>
+                        {[80, 85, 90, 95, 100].map((val) => (
+                          <button
+                            key={val}
+                            type="button"
+                            className="ghost sm"
+                            style={{ padding: "1px 6px", fontSize: "11px", height: "auto" }}
+                            title={`Set semua lesson pada meeting ini ke ${val}`}
+                            onClick={() => {
+                              setScores((prev) => {
+                                const updated = { ...(prev[editEntry.key] || {}) };
+                                for (const a of editEntry.activities || []) {
+                                  updated[a.id] = val;
+                                }
+                                return { ...prev, [editEntry.key]: updated };
+                              });
+                            }}
+                          >
+                            {val}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {(editEntry.activities || []).map((a) => {
+                        const curVal = scores[editEntry.key]?.[a.id] ?? a.score;
+                        return (
+                          <div
+                            key={a.id}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              background: "rgba(125, 125, 125, 0.05)",
+                              padding: "6px 10px",
+                              borderRadius: "6px",
+                              border: "1px solid var(--line)",
+                            }}
+                          >
+                            <span className="small" style={{ fontWeight: 500, flex: 1, marginRight: "8px" }}>
+                              {a.name || `Lesson ${a.id}`}
+                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="1"
+                                value={curVal}
+                                style={{ width: "60px", padding: "3px 6px", textAlign: "center", fontWeight: 600 }}
+                                onChange={(ev) => {
+                                  const val = ev.target.value;
+                                  setScores((prev) => ({
+                                    ...prev,
+                                    [editEntry.key]: {
+                                      ...(prev[editEntry.key] || {}),
+                                      [a.id]: val === "" ? "" : Number(val),
+                                    },
+                                  }));
+                                }}
+                                aria-label={`Skor untuk ${a.name || 'Lesson'}`}
+                              />
+                              <span className="muted small">/ 100</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                   {(() => {
                     const st = statusOf(editEntry.key);

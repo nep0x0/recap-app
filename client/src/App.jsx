@@ -7,54 +7,12 @@ import SettingsPage from "./SettingsPage.jsx";
 import JournalPanel from "./JournalPanel.jsx";
 import ReportPage from "./ReportPage.jsx";
 import { createConnGuard } from "./conn.js";
-import { IconClose, IconRefresh, IconWifiOff } from "./icons.jsx";
+import ToastContainer from "./components/common/ToastContainer.jsx";
+import Splash from "./components/layout/Splash.jsx";
+import ServerDownScreen from "./components/layout/ServerDownScreen.jsx";
+import { useToast } from "./hooks/useToast.js";
 
 const VIEWS = ["dashboard", "journal", "report", "settings"];
-
-function Toasts({ toasts, close }) {
-  return (
-    <div className="toasts">
-      {toasts.map((t) => (
-        <div key={t.id} className={`toast ${t.kind}`}>
-          <span>{t.text}</span>
-          <button onClick={() => close(t.id)} aria-label="Tutup">
-            <IconClose width={14} height={14} />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Splash() {
-  return (
-    <div className="splash">
-      <span className="spinner neutral" />
-      <span className="muted small">Menghubungi server…</span>
-    </div>
-  );
-}
-
-function ServerDownScreen({ onRetry }) {
-  return (
-    <div className="login-page">
-      <div className="login-card card offscreen-card">
-        <span className="offscreen-ico">
-          <IconWifiOff width={26} height={26} />
-        </span>
-        <h1 style={{ fontSize: 20 }}>Tidak bisa menghubungi server</h1>
-        <p className="login-desc">
-          Aplikasi ini berjalan bersama server RecapApp di komputer/LAN kamu. Sepertinya servernya sedang
-          mati atau terputus. Nyalakan dulu, lalu coba lagi — akun CMS kamu aman.
-        </p>
-        <button className="primary full" onClick={onRetry}>
-          <IconRefresh width={16} height={16} />
-          Coba lagi
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   const [status, setStatus] = useState(null);
@@ -70,12 +28,13 @@ export default function App() {
       return "dashboard";
     }
   });
-  const [toasts, setToasts] = useState([]);
+
+  const { toasts, notify, closeToast } = useToast();
   const [recapRows, setRecapRows] = useState([]);
   const [recapLoading, setRecapLoading] = useState(true);
   const [recapRunning, setRecapRunning] = useState(false);
   const [recapState, setRecapState] = useState(null);
-  const toastId = useRef(0);
+
   const wasValid = useRef(false);
   const statusFails = useRef(0);
   const statusRef = useRef(null);
@@ -85,35 +44,27 @@ export default function App() {
     statusRef.current = status;
   }, [status]);
 
-  if (!connGuard.current) connGuard.current = createConnGuard((k, t) => notify(k, t));
+  if (!connGuard.current) {
+    connGuard.current = createConnGuard((k, t) => notify(k, t));
+  }
   const guard = connGuard.current;
 
-  const notify = (kind, text) => {
-    const id = ++toastId.current;
-    setToasts((t) => [...t, { id, kind, text }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === "err" ? 9000 : 5200);
-  };
-
-  const closeToast = (id) => setToasts((t) => t.filter((x) => x.id !== id));
-
-  const loadStatus = useCallback(
-    async () => {
-      try {
-        setStatus(await api.status());
-        statusFails.current = 0;
-        guard.ok();
-        setServerDown(false);
-      } catch {
-        statusFails.current += 1;
-        guard.fail();
-        // layar "server mati" hanya bila gagal beruntun (≥2) atau belum pernah sukses
-        if (statusFails.current >= 2 || !statusRef.current) setServerDown(true);
-      } finally {
-        setBooted(true);
+  const loadStatus = useCallback(async () => {
+    try {
+      setStatus(await api.status());
+      statusFails.current = 0;
+      guard.ok();
+      setServerDown(false);
+    } catch {
+      statusFails.current += 1;
+      guard.fail();
+      if (statusFails.current >= 2 || !statusRef.current) {
+        setServerDown(true);
       }
-    },
-    [guard]
-  );
+    } finally {
+      setBooted(true);
+    }
+  }, [guard]);
 
   const loadRecaps = useCallback(async () => {
     setRecapLoading(true);
@@ -125,7 +76,7 @@ export default function App() {
     } finally {
       setRecapLoading(false);
     }
-  }, []);
+  }, [notify]);
 
   useEffect(() => {
     loadStatus();
@@ -133,14 +84,19 @@ export default function App() {
     return () => clearInterval(t);
   }, [loadStatus]);
 
+  const sessionValid = Boolean(status?.sessionValid);
+  const studentCount = status?.studentCount ?? 0;
+  const loginEmail = status?.loginEmail ?? null;
+
   useEffect(() => {
-    if (booted && sessionValid) wasValid.current = true;
-    else if (booted && sessionValid === false && wasValid.current && !serverDown) {
+    if (booted && sessionValid) {
+      wasValid.current = true;
+    } else if (booted && sessionValid === false && wasValid.current && !serverDown) {
       wasValid.current = false;
       setLoginNotice("Sesi berakhir atau token tidak valid — silakan masuk kembali.");
     }
     if (booted && sessionValid) setLoginNotice("");
-  }, [booted, status, serverDown]);
+  }, [booted, sessionValid, serverDown]);
 
   useEffect(() => {
     (async () => {
@@ -174,7 +130,7 @@ export default function App() {
       } catch {}
     }, 1500);
     return () => clearInterval(t);
-  }, [recapRunning]);
+  }, [recapRunning, loadRecaps, notify]);
 
   const handleViewChange = (v) => {
     setView(v);
@@ -236,16 +192,12 @@ export default function App() {
     }
   };
 
-  const sessionValid = Boolean(status?.sessionValid);
-  const studentCount = status?.studentCount ?? 0;
-  const loginEmail = status?.loginEmail ?? null;
-
   if (!booted) return <Splash />;
 
   if (serverDown && !status) {
     return (
       <div className="app">
-        <Toasts toasts={toasts} close={closeToast} />
+        <ToastContainer toasts={toasts} onClose={closeToast} />
         <ServerDownScreen onRetry={loadStatus} />
       </div>
     );
@@ -254,7 +206,7 @@ export default function App() {
   if (!sessionValid) {
     return (
       <div className="app">
-        <Toasts toasts={toasts} close={closeToast} />
+        <ToastContainer toasts={toasts} onClose={closeToast} />
         <LoginPage busy={busy} notice={loginNotice} onApiLogin={handleApiLogin} />
       </div>
     );
@@ -262,8 +214,14 @@ export default function App() {
 
   return (
     <div className="app">
-      <Toasts toasts={toasts} close={closeToast} />
-      <Layout view={view} onViewChange={handleViewChange} sessionValid={sessionValid} loginEmail={loginEmail} onLogout={handleLogout}>
+      <ToastContainer toasts={toasts} onClose={closeToast} />
+      <Layout
+        view={view}
+        onViewChange={handleViewChange}
+        sessionValid={sessionValid}
+        loginEmail={loginEmail}
+        onLogout={handleLogout}
+      >
         {view === "dashboard" && (
           <DashboardPage
             sessionValid={sessionValid}
@@ -281,7 +239,13 @@ export default function App() {
         {view === "journal" && <JournalPanel sessionValid={sessionValid} notify={notify} />}
         {view === "report" && <ReportPage notify={notify} />}
         {view === "settings" && (
-          <SettingsPage status={status} sessionValid={sessionValid} busy={busy} act={act} onLogout={handleLogout} />
+          <SettingsPage
+            status={status}
+            sessionValid={sessionValid}
+            busy={busy}
+            act={act}
+            onLogout={handleLogout}
+          />
         )}
       </Layout>
     </div>
