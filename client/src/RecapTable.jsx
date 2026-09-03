@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmtNum, needsAttention, pct, relDate } from "./fmt.js";
-import { IconChevronUp, IconChevronDown, IconSearch, IconClose } from "./icons.jsx";
+import { IconChevronUp, IconChevronDown, IconSearch, IconClose, IconReport } from "./icons.jsx";
 
 function MiniBar({ a, b }) {
   const p = pct(a, b);
@@ -237,15 +237,56 @@ export default function RecapTable({ rows, loading, running, state, onlyAtt, onO
     }
   };
 
+  const exportCsv = () => {
+    if (!rows.length) return;
+    const headers = ["Nama Siswa", "Course", "Progress", "Total", "Persen", "Kuis", "Koin", "Pertemuan Terakhir"];
+    const lines = [headers.join(",")];
+    for (const r of rows) {
+      const p = r.total_progress > 0 ? Math.round((r.latest_progress / r.total_progress) * 100) : 0;
+      const row = [
+        `"${(r.student_name || "").replace(/"/g, '""')}"`,
+        `"${(r.course_name || "").replace(/"/g, '""')}"`,
+        r.latest_progress ?? 0,
+        r.total_progress ?? 0,
+        `"${p}%"`,
+        r.quiz_count ?? 0,
+        r.coins ?? 0,
+        `"${r.last_lesson_date ? r.last_lesson_date.slice(0, 10) : "-"}"`,
+      ];
+      lines.push(row.join(","));
+    }
+    const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `recap-siswa-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <section className="card">
       <div className="row spread wrap">
         <h3 className="sect-title">Recap pelajaran</h3>
-        {running && (
-          <span className="pulsetext">
-            <span className="spinner sm" /> membuat recap… {state?.current ?? "?"}/{state?.total ?? "?"}
-          </span>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {running && (
+            <span className="pulsetext">
+              <span className="spinner sm" /> membuat recap… {state?.current ?? "?"}/{state?.total ?? "?"}
+              {state?.total > 0 ? ` (${Math.round(((state.current || 0) / state.total) * 100)}%)` : ""}
+            </span>
+          )}
+          <button
+            type="button"
+            className="ghost sm"
+            style={{ gap: "5px", padding: "4px 10px" }}
+            onClick={exportCsv}
+            disabled={!rows.length || running}
+            title="Unduh data rekap ke file CSV (Excel)"
+          >
+            <IconReport width={14} height={14} />
+            Ekspor CSV
+          </button>
+        </div>
       </div>
       <div className="row toolbar">
         <div className="searchwrap grow-search">

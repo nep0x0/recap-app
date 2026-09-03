@@ -1,45 +1,7 @@
-const fs = require("fs");
-const path = require("path");
-const { DatabaseSync } = require("node:sqlite");
-
-const DATA_DIR = path.join(__dirname, "..", "data");
-const API_ORIGIN = "https://cms.timedooracademy.com";
-const API_BASE = `${API_ORIGIN}/api`;
-
-function getDb() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  const db = new DatabaseSync(path.join(DATA_DIR, "recap.db"));
-  db.exec(`CREATE TABLE IF NOT EXISTS students (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    info TEXT,
-    raw TEXT,
-    updated_at TEXT DEFAULT (datetime('now'))
-  )`);
-  return db;
-}
-
-function dedupe(students) {
-  const seen = new Set();
-  return students.filter((s) => {
-    if (seen.has(s.id)) return false;
-    seen.add(s.id);
-    return true;
-  });
-}
-
-async function fetchJson(url, headers, ttl = 20000) {
-  const r = await fetch(API_ORIGIN + url, {
-    headers: {
-      authorization: "Bearer " + headers.token,
-      "x-app-branch": headers.branch,
-      "x-app-timezone": headers.timezone,
-    },
-    signal: AbortSignal.timeout(ttl),
-  });
-  if (!r.ok) throw new Error("HTTP " + r.status);
-  return r.json();
-}
+const { API_BASE } = require("../config");
+const { getDb } = require("../db");
+const { fetchJson } = require("../lib/cms-client");
+const { dedupe } = require("../lib/utils");
 
 async function fetchStudentPages(headers) {
   const limit = 100;
@@ -47,8 +9,10 @@ async function fetchStudentPages(headers) {
   let meta = null;
   const pages = [];
   for (;;) {
-    const json = await fetchJson(`/api/tms/student?search=&limit=${limit}&page=${p}`, headers);
-    if (!Array.isArray(json.data) || !json.meta || !json.meta.last_page) throw new Error("BAD_RESPONSE");
+    const json = await fetchJson(`/api/tms/student?search=&limit=${limit}&page=${p}`, headers, { ttl: 20000 });
+    if (!Array.isArray(json.data) || !json.meta || !json.meta.last_page) {
+      throw new Error("BAD_RESPONSE");
+    }
     meta = json.meta;
     pages.push(json.data);
     if (p >= json.meta.last_page) break;
@@ -79,9 +43,10 @@ async function syncStudents(api) {
         students.push({
           id,
           name: String(o.name ?? `Siswa #${id}`).slice(0, 200),
-          info: o.code != null || o.total_sessions != null
-            ? `${o.code ?? ""} ${o.total_sessions != null ? "· " + o.total_sessions + " sesi" : ""}`.trim()
-            : "",
+          info:
+            o.code != null || o.total_sessions != null
+              ? `${o.code ?? ""} ${o.total_sessions != null ? "· " + o.total_sessions + " sesi" : ""}`.trim()
+              : "",
           raw: o,
         });
       }
@@ -90,8 +55,10 @@ async function syncStudents(api) {
 
   students = dedupe(students);
   const db = getDb();
-  const upsert = db.prepare(`INSERT INTO students (id, name, info, raw, updated_at) VALUES (?, ?, ?, ?, datetime('now'))
-    ON CONFLICT(id) DO UPDATE SET name = excluded.name, info = excluded.info, raw = excluded.raw, updated_at = excluded.updated_at`);
+  const upsert = db.prepare(`
+    INSERT INTO students (id, name, info, raw, updated_at) VALUES (?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(id) DO UPDATE SET name = excluded.name, info = excluded.info, raw = excluded.raw, updated_at = excluded.updated_at
+  `);
   let inserted = 0;
   for (const s of students) {
     const prev = db.prepare("SELECT id FROM students WHERE id = ?").get(s.id);
@@ -104,4 +71,8 @@ async function syncStudents(api) {
   return { loggedIn: true, students: count, inserted, pages, method: "api" };
 }
 
-module.exports = { getDb, syncStudents, BASE_URL: API_BASE };
+module.exports = {
+  getDb,
+  syncStudents,
+  BASE_URL: API_BASE,
+};
