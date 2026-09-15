@@ -1,4 +1,5 @@
 import { IconDashboard, IconJournal, IconReport, IconSettings, IconLogout } from "./icons.jsx";
+import ThemeToggle from "./ThemeToggle.jsx";
 
 const NAV = [
   {
@@ -81,10 +82,13 @@ export default function Layout({ view, onViewChange, sessionValid, loginEmail, o
               </span>
             </div>
           )}
-          <button className="ghost small-btn side-logout" onClick={onLogout}>
-            <IconLogout width={15} height={15} />
-            Keluar
-          </button>
+          <div className="side-foot-row">
+            <ThemeToggle />
+            <button className="ghost small-btn side-logout" onClick={onLogout}>
+              <IconLogout width={15} height={15} />
+              Keluar
+            </button>
+          </div>
         </div>
       </aside>
 
