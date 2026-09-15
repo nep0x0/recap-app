@@ -22,7 +22,7 @@ export default function ReportModal({
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
-        className="modal"
+        className="modal modal-wide"
         ref={trapRef}
         tabIndex={-1}
         role="dialog"
@@ -84,14 +84,13 @@ export default function ReportModal({
             {journalsOk && !preview.covered?.covered && (
               <>
                 <div className="modal-body">
-                  <div className="quick-score-bar" style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
-                    <span className="muted small" style={{ fontWeight: 600, marginRight: "4px" }}>Set Semua Skor:</span>
+                  <div className="quick-score-bar">
+                    <span className="muted small qs-label">Set Semua Skor:</span>
                     {[80, 85, 90, 95, 100].map((val) => (
                       <button
                         key={val}
                         type="button"
-                        className="ghost sm"
-                        style={{ padding: "2px 8px", fontSize: "12px", height: "auto" }}
+                        className="ghost sm qscore-btn"
                         title={`Isi semua kriteria dengan skor ${val}`}
                         onClick={() =>
                           setCriteria((arr) =>
@@ -133,7 +132,7 @@ export default function ReportModal({
                           }
                         />
                         <textarea
-                          rows={2}
+                          rows={3}
                           placeholder="Catatan guru (opsional)"
                           disabled={!c.include}
                           value={c.note}

@@ -579,7 +579,11 @@ button.chip.active:hover {
 }
 
 @media (max-width: 640px) {
-  .modal-backdrop {
+.modal-wide {
+  max-width: 680px;
+}
+
+.modal-backdrop {
     align-items: flex-end;
     padding: 0;
   }
@@ -697,7 +701,7 @@ button.chip.active:hover {
   flex-wrap: wrap;
   gap: 8px 10px;
   font-size: 13.5px;
-  padding: 8px;
+  padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: var(--r);
   background: var(--surface);
@@ -731,6 +735,7 @@ button.chip.active:hover {
   gap: 10px;
   align-items: stretch;
   flex: 1 1 100%;
+  margin-top: 2px;
 }
 
 .crit-inputs input,
@@ -753,14 +758,14 @@ button.chip.active:hover {
 }
 
 .crit-inputs input {
-  width: 88px;
+  width: 96px;
   flex: 0 0 auto;
 }
 
 .crit-inputs textarea {
   flex: 1;
   resize: vertical;
-  min-height: 44px;
+  min-height: 66px;
 }
 
 .tbl-mobile {
@@ -2132,14 +2137,24 @@ tr.course.openrow td {
   margin: 0;
 }
 
-/* baris kriteria: padding samping lebih lega */
-.crit-row {
-  padding: 11px 12px;
+/* baris tombol "Set Semua Skor" */
+.quick-score-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
-/* input skor & catatan sejajar rapi saat turun baris */
-.crit-inputs {
-  margin-top: 2px;
+.quick-score-bar > .qs-label {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.qscore-btn {
+  padding: 2px 8px !important;
+  font-size: 12px !important;
+  height: auto;
 }
 
 /* jarak footer modal sedikit lebih longgar dari isi */
