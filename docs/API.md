@@ -9,7 +9,7 @@ Otomasi report & jurnal siswa Timedoor Academy. Server Express (`server/index.js
 - **Auth app**: tidak ada token khusus app — server memakai **sesi CMS** guru yang tersimpan di `server/data/profile/storage.json` (hasil login). Endpoint yang menyentuh CMS memvalidasi sesi dulu (`validateSession()`); bila token kedaluwarsa, server otomatis mencoba refresh via `refresh_token`.
 - **Error umum**:
   - `400` — parameter hilang/tidak valid: `{ "error": "…" }`
-  - `401` — sesi CMS tidak valid (`NOT_LOGGED_IN`) — hanya untuk route yang melempar error ini (mis. `POST /api/recap`, `POST /api/journal/plan`). Endpoint report lain mengembalikan `{ ok: false, error/message }` dengan status 400.
+  - `401` — sesi CMS tidak valid (`NOT_LOGGED_IN`) — hanya untuk route yang melempar error ini (mis. `POST /api/recap`). Job (`POST /api/journal/plan`, `POST /api/journal/fill`) tidak menolak di trigger — `NOT_LOGGED_IN` muncul di `failed` endpoint status. Endpoint report lain mengembalikan `{ ok: false, error/message }` dengan status 400.
   - `500` — error tak terduga: `{ "error": "…" }`
 - **Job background**: beberapa endpoint memulai proses async di memori (satu proses Node, state tidak persisten antar restart). Pola: panggil trigger → dapat `{ "started": true }` → **poll status** sampai `running: false`. Pemicu kedua saat masih jalan → `{ "started": false, "reason": "ALREADY_RUNNING" }`.
 - **Rate limit CMS**: semua request ke CMS di-jeda **400 ms** (konstanta `REQUEST_DELAY` di tiap service).
@@ -27,7 +27,8 @@ Otomasi report & jurnal siswa Timedoor Academy. Server Express (`server/index.js
 | POST | `/api/recap` | Rekap progres semua siswa | **job** (poll `/api/recap-status`) | 3 |
 | GET | `/api/recap-status` | Status job recap | — | 3 |
 | GET | `/api/recaps` | Rekapan tersimpan | langsung | 3 |
-| POST | `/api/journal/plan` | Susun draf jurnal (read-only CMS) | langsung | 4 |
+| POST | `/api/journal/plan` | Susun draf jurnal (read-only CMS) | **job** (poll `/api/journal/plan-status`) | 4 |
+| GET | `/api/journal/plan-status` | Status job plan (progres + hasil) | — | 4 |
 | POST | `/api/journal/fill` | Kirim jurnal ke CMS | **job** (poll `/api/journal/status`) | 4 |
 | GET | `/api/journal/status` | Status job fill | — | 4 |
 | POST | `/api/report/scan` | Pindai blok report semua siswa | **job** (poll `/api/report/scan-status`) | 5 |
@@ -276,15 +277,52 @@ Ref: `server/index.js:122` · `recap.js:213` (`listRecaps`), `recap.js:71` (`par
 
 ## 4. Jurnal Meeting
 
-Alur: `POST /api/journal/plan` (susun draf dari data CMS) → edit/pilih di UI → `POST /api/journal/fill` (kirim ke CMS, async) → `GET /api/journal/status` (poll hasil). `plan` **tidak menulis apa pun** ke CMS; `fill` yang menulis (POST upsert jurnal).
+Alur: `POST /api/journal/plan` (susun draf dari data CMS — job background) → `GET /api/journal/plan-status` (poll progres + hasil) → edit/pilih di UI → `POST /api/journal/fill` (kirim ke CMS, async) → `GET /api/journal/status` (poll hasil). `plan` **tidak menulis apa pun** ke CMS; `fill` yang menulis (POST upsert jurnal).
 
 ### POST /api/journal/plan
 
-Untuk tiap siswa (atau satu bila `student_id` diisi): ambil meeting-history + `activity` (skor per aktivitas), hitung lesson yang belum tercatat di jurnal, teruskan (carry) lesson ke meeting berikutnya sampai ada kelipatan 8 (batas report), lalu susun draf entry. Meeting yang sudah punya jurnal dilewati (`skipped`).
+Job background: untuk tiap siswa (atau satu bila `student_id` diisi): ambil meeting-history + `activity` (skor per aktivitas), hitung lesson yang belum tercatat di jurnal, teruskan (carry) lesson ke meeting berikutnya sampai ada kelipatan 8 (batas report), lalu susun draf entry. Meeting yang sudah punya jurnal dilewati (`skipped`). `plan` read-only — tidak menulis apa pun ke CMS.
 
 **Body:** `{ "student_id": 60251 }` — kosongkan = semua siswa.
 
 **Respons 200:**
+```json
+{ "started": true }
+```
+
+Bila job plan lain masih berjalan: `{ "started": false, "reason": "ALREADY_RUNNING" }`. Sesi CMS yang habis **tidak** ditolak di trigger — job mulai, lalu gagal setelah beberapa detik dan muncul sebagai `failed` di status (pesan `NOT_LOGGED_IN`).
+
+Progres dan hasil akhir diambil via `GET /api/journal/plan-status` (lihat di bawah). Ref: `server/controllers/journal.controller.js` · `server/services/journal/journal-plan.service.js` (`runPlan`), `journal-course-plan.service.js` (`buildCoursePlan`).
+
+---
+
+### GET /api/journal/plan-status
+
+Progres job plan terakhir. State disimpan di memori server — hilang bila server di-restart (plan adalah draf read-only, bisa dibuat ulang kapan saja).
+
+**Respons 200:**
+```json
+{
+  "running": true,
+  "startedAt": "2026-09-16T10:00:00.000Z",
+  "current": 5,
+  "total": 32,
+  "label": "Kiano Byan Azala",
+  "plan": null,
+  "failed": []
+}
+```
+
+| Field | Keterangan |
+|---|---|
+| `running` | Job sedang berjalan |
+| `startedAt` | ISO timestamp mulai |
+| `current` / `total` | Siswa ke-n / total siswa dalam filter `student_id` |
+| `label` | Nama siswa yang sedang diproses |
+| `plan` | Hasil akhir saat `running: false`; `null` selama berjalan |
+| `failed` | `[{ message }]` — mis. `NOT_LOGGED_IN` bila sesi CMS habis di tengah job |
+
+**Bentuk `plan`** (saat selesai) — sama dengan respons plan versi lama:
 ```json
 {
   "built_at": "2026-08-16T10:00:00.000Z",
@@ -336,7 +374,7 @@ Untuk tiap siswa (atau satu bila `student_id` diisi): ambil meeting-history + `a
 
 `skipped.reason`: `exists` (jurnal sudah ada; `lessons` = yang belum tercatat di jurnal itu), `moved` (lesson dibawa ke meeting berikutnya karena melewati batas kelipatan 8), `empty` (tidak ada lesson yang ditulis).
 
-`401 NOT_LOGGED_IN` bila sesi CMS habis. Ref: `server/index.js:126` · `server/services/journal.js:235` (`buildPlan`), `journal.js:87` (`buildCoursePlan`).
+`NOT_LOGGED_IN` bila sesi CMS habis **saat job berjalan** — muncul di `failed` status, bukan ditolak di trigger. Ref: `server/routes/journal.routes.js` · `server/controllers/journal.controller.js` · `server/services/journal/journal-plan.service.js` (`runPlan`), `journal-course-plan.service.js` (`buildCoursePlan`).
 
 ---
 
@@ -373,7 +411,7 @@ Job background: kirim draf entries ke CMS (`POST .../meeting-history/{meetingId}
 
 `results[i]`: `{ "meeting_id", "meeting_name", "ok": true|false, "status": "ok"|"skipped"|"failed", "message" }` — `failed` berisi salinan hasil yang gagal `{ meeting_id, meeting_name, message }`.
 
-Ref: `server/index.js:136,145` · `journal.js:289` (`runFill`), `journal.js:26` (`getFillStatus`).
+Ref: `server/routes/journal.routes.js` · `server/services/journal/journal-fill.service.js` (`runFill`, `getFillStatus`).
 
 ---
 
@@ -616,7 +654,7 @@ Pratinjau blok sebelum create: jurnal meeting yang memuat lesson dalam rentang b
 - `"Course ini sudah ditandai selesai — batalkan di bagian 'Ditandai selesai' dulu"`
 - `"Sesi CMS berakhir — masuk ulang"`
 
-Ref: `server/index.js:194` · `report.js:340` (`previewBlock`), `report.js:578` (`fetchCourseCriteria`), `report.js:592` (`templateForBlock`), `journal.js:360` (`analyzeBlockJournals`).
+Ref: `server/routes/report.routes.js` · `server/services/report/report-preview.service.js` (`previewBlock`), `report-helpers.js` (`fetchCourseCriteria`, `templateForBlock`), `server/services/journal/journal-block.service.js` (`analyzeBlockJournals`).
 
 ---
 
@@ -659,7 +697,7 @@ Buat report satu blok ke CMS: validasi ulang (jurnal ada di rentang, tidak overl
 - `"Course ini sudah ditandai selesai — batalkan di bagian 'Ditandai selesai' dulu"`
 - `"Sesi CMS berakhir — masuk ulang"` · pesan error dari CMS (`resp.data.message`)
 
-Semua hasil (sukses/gagal) tercatat di `report_log` (lihat `/api/report/logs`). Ref: `server/index.js:209` · `report.js:411` (`createBlockReport`), `journal.js:425` (`ensureJournalsForBlock`).
+Semua hasil (sukses/gagal) tercatat di `report_log` (lihat `/api/report/logs`). Ref: `server/routes/report.routes.js` · `server/controllers/report.controller.js` · `server/services/report/report-create.service.js` (`createBlockReport`), `journal-block.service.js` (`ensureJournalsForBlock`).
 
 ---
 

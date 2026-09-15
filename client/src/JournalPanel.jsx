@@ -3,6 +3,7 @@ import { api } from "./api.js";
 import { fmtNum } from "./fmt.js";
 import { createConnGuard } from "./conn.js";
 import ConfirmDialog from "./ConfirmDialog.jsx";
+import Progress from "./Progress.jsx";
 import { IconJournal, IconCheck } from "./icons.jsx";
 
 function JournalPanel({ sessionValid, notify }) {
@@ -19,12 +20,17 @@ function JournalPanel({ sessionValid, notify }) {
   const [courseFilter, setCourseFilter] = useState("");
   const [fillRunning, setFillRunning] = useState(false);
   const [fillState, setFillState] = useState(null);
+  const [planRunning, setPlanRunning] = useState(false);
+  const [planState, setPlanState] = useState(null);
   const [editKey, setEditKey] = useState("");
   const [confirmBox, setConfirmBox] = useState(null); // { type: "fill" | "rebuild", count }
   const [confirmBusy, setConfirmBusy] = useState(false);
   const pollRef = useRef(null);
   const guardRef = useRef(null);
+  const planPollRef = useRef(null);
+  const planGuardRef = useRef(null);
   if (!guardRef.current) guardRef.current = createConnGuard(notify);
+  if (!planGuardRef.current) planGuardRef.current = createConnGuard(notify);
 
   useEffect(() => {
     if (!sessionValid) return;
@@ -100,25 +106,35 @@ function JournalPanel({ sessionValid, notify }) {
     });
   };
 
+  const applyPlan = (r) => {
+    setPlan(r);
+    setNotes(Object.fromEntries(r.entries.map((e) => [e.key, e.note])));
+    setDrafts(Object.fromEntries(r.entries.map((e) => [e.key, e.note])));
+    const sMap = {};
+    for (const e of r.entries) {
+      sMap[e.key] = {};
+      for (const a of e.activities || []) {
+        sMap[e.key][a.id] = a.score;
+      }
+    }
+    setScores(sMap);
+    setDraftScores(sMap);
+    setSelected(new Set(r.entries.map((e) => e.key)));
+  };
+
+  const planMessage = (m) =>
+    m === "NOT_LOGGED_IN" || m === "NO_TOKEN" ? "Sesi CMS berakhir — masuk kembali." : m || "Gagal tidak dikenal";
+
   const buildPlan = async () => {
     setPlanLoading(true);
     try {
       const r = await api.journalPlan(selectedStudent || undefined);
-      if (!r || !r.entries) throw new Error(r?.error || "Respons tidak dikenal");
-      setPlan(r);
-      setNotes(Object.fromEntries(r.entries.map((e) => [e.key, e.note])));
-      setDrafts(Object.fromEntries(r.entries.map((e) => [e.key, e.note])));
-      const sMap = {};
-      for (const e of r.entries) {
-        sMap[e.key] = {};
-        for (const a of e.activities || []) {
-          sMap[e.key][a.id] = a.score;
-        }
+      if (!r) throw new Error("Respons tidak dikenal");
+      if (!r.started) {
+        throw new Error(r.reason === "ALREADY_RUNNING" ? "Pembuatan rencana sedang berjalan" : r.reason || "Gagal");
       }
-      setScores(sMap);
-      setDraftScores(sMap);
-      setSelected(new Set(r.entries.map((e) => e.key)));
-      notify("ok", `Rencana jurnal dibuat — ${r.entry_count} catatan menunggu pengecekan.`);
+      setPlanRunning(true);
+      setPlanState({ current: 0, total: 0, label: "" });
     } catch (e) {
       notify("err", `Buat rencana gagal: ${e.message}`);
     } finally {
@@ -128,7 +144,7 @@ function JournalPanel({ sessionValid, notify }) {
 
   // R3: Buat Ulang meminta konfirmasi bila ada editan yang akan hilang
   const requestRebuild = () => {
-    if (editedTotal > 0 && !planLoading) {
+    if (editedTotal > 0 && !planLoading && !planRunning) {
       setConfirmBox({ type: "rebuild", count: editedTotal });
     } else {
       buildPlan();
@@ -142,7 +158,27 @@ function JournalPanel({ sessionValid, notify }) {
     }
   };
 
-  useEffect(() => stopPoll, []);
+  const stopPlanPoll = () => {
+    if (planPollRef.current) {
+      clearInterval(planPollRef.current);
+      planPollRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    api
+      .journalPlanStatus()
+      .then((s) => {
+        if (s && s.running) {
+          setPlanRunning(true);
+          setPlanState(s);
+        }
+      })
+      .catch(() => {});
+    return () => stopPlanPoll();
+  }, []);
+
+  useEffect(() => stopPlanPoll, []);
 
   useEffect(() => {
     if (!fillRunning) return;
@@ -165,10 +201,36 @@ function JournalPanel({ sessionValid, notify }) {
         guardRef.current.fail();
       }
     }, 1400);
-    pollRef.current = t;
+      pollRef.current = t;
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fillRunning]);
+
+  useEffect(() => {
+    if (!planRunning) return;
+    const t = setInterval(async () => {
+      try {
+        const s = await api.journalPlanStatus();
+        planGuardRef.current.ok();
+        setPlanState(s);
+        if (!s.running) {
+          setPlanRunning(false);
+          stopPlanPoll();
+          if (s.plan) {
+            applyPlan(s.plan);
+            notify("ok", `Rencana jurnal dibuat — ${s.plan.entry_count} catatan menunggu pengecekan.`);
+          } else {
+            notify("err", `Buat rencana gagal: ${planMessage(s.failed?.[0]?.message)}`);
+          }
+        }
+      } catch {
+        planGuardRef.current.fail();
+      }
+    }, 1400);
+    planPollRef.current = t;
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planRunning]);
 
   const statusOf = (key) => {
     if (!fillState) return null;
@@ -265,7 +327,7 @@ function JournalPanel({ sessionValid, notify }) {
         </div>
         {!plan || planLoading ? (
           <div className="row">
-            <select value={selectedStudent} onChange={(e) => setSelectedStudent(e.target.value)} aria-label="Pilih siswa untuk rencana" disabled={planLoading}>
+            <select value={selectedStudent} onChange={(e) => setSelectedStudent(e.target.value)} aria-label="Pilih siswa untuk rencana" disabled={planLoading || planRunning}>
               <option value="">Semua siswa</option>
               {studentOptions.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -273,8 +335,8 @@ function JournalPanel({ sessionValid, notify }) {
                 </option>
               ))}
             </select>
-            <button className="primary" disabled={!sessionValid || planLoading} onClick={buildPlan}>
-              {planLoading ? (
+            <button className="primary" disabled={!sessionValid || planLoading || planRunning} onClick={buildPlan}>
+              {planLoading || planRunning ? (
                 <>
                   <span className="spinner sm" /> Membuat rencana…
                 </>
@@ -284,8 +346,8 @@ function JournalPanel({ sessionValid, notify }) {
             </button>
           </div>
         ) : (
-          <button className="ghost" onClick={requestRebuild} disabled={planLoading}>
-            {planLoading ? (
+          <button className="ghost" onClick={requestRebuild} disabled={planLoading || planRunning}>
+            {planLoading || planRunning ? (
               <>
                 <span className="spinner sm" /> Membuat rencana…
               </>
@@ -295,6 +357,16 @@ function JournalPanel({ sessionValid, notify }) {
           </button>
         )}
       </div>
+
+      {planRunning && planState && (
+        <Progress
+          current={planState.current}
+          total={planState.total}
+          label={`Menyusun rencana · ${planState.current}/${planState.total || "?"} siswa${
+            planState.label ? ` · ${planState.label}` : ""
+          }`}
+        />
+      )}
 
       {plan && (
         <>

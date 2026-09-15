@@ -99,7 +99,8 @@ Alur dua langkah:
 1. Buka tab **Jurnal Meeting**.
 2. Pilih siswa (atau beberapa siswa).
 3. Klik **Susun draf**.
-4. Server mengambil data meeting dari CMS lalu menampilkan pratinjau. Periksa isinya.
+4. Proses berjalan sebagai job background — progress bar menampilkan siswa ke-n dari total. **Aman pindah tab atau refresh halaman**: job lanjut di server, dan saat kamu kembali ke tab Jurnal polling akan menyambung lagi.
+5. Setelah selesai, pratinjau muncul. Periksa isinya.
 
 ### Langkah B — Kirim ke CMS
 
