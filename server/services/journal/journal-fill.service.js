@@ -1,4 +1,3 @@
-const { API_ORIGIN } = require("../../config");
 const { getDb } = require("../../db");
 const { fetchJson } = require("../../lib/cms-client");
 const { sleep } = require("../../lib/utils");
@@ -52,44 +51,32 @@ function runFill(api, entries) {
           if (r.data && r.data.id) {
             const msg = "sudah ada, dilewati";
             logEntry(db, e, "skipped", msg);
-            fillRun.results.push({ meeting_id: e.meeting_id, meeting_name: e.meeting_name, ok: false, status: "skipped", message: msg });
+            fillRun.results.push({ student_id: e.student_id, meeting_id: e.meeting_id, meeting_name: e.meeting_name, ok: false, status: "skipped", message: msg });
             continue;
           }
         } catch {}
 
         try {
-          const r = await fetch(API_ORIGIN + url, {
+          await fetchJson(url, headers, {
             method: "POST",
-            headers: {
-              authorization: "Bearer " + headers.token,
-              "x-app-branch": headers.branch,
-              "x-app-timezone": headers.timezone,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
+            body: {
               note: e.note,
-              learning_session_book_meeting_activities: (e.activities || []).map((a) => ({
-                id: a.id,
-                score: typeof a.score === "number" ? a.score : parseInt(a.score, 10) || 85,
-              })),
-            }),
-            signal: AbortSignal.timeout(30000),
+              learning_session_book_meeting_activities: (e.activities || []).map((a) => {
+                // Jepit skor ke 0–100 (ditulis ke CMS asli). Kosong/invalid → 85.
+                let score = a.score;
+                if (typeof score !== "number") score = Number(score);
+                score = Number.isFinite(score) ? score : 85;
+                return { id: a.id, score: Math.max(0, Math.min(100, Math.round(score))) };
+              }),
+            },
           });
-          const body = await r.json().catch(() => null);
-          if (r.status >= 200 && r.status < 300) {
-            logEntry(db, e, "ok", "tertulis");
-            fillRun.results.push({ meeting_id: e.meeting_id, meeting_name: e.meeting_name, ok: true, status: "ok", message: "tertulis" });
-          } else {
-            const msg = body?.message || `HTTP ${r.status}`;
-            logEntry(db, e, "failed", msg);
-            fillRun.results.push({ meeting_id: e.meeting_id, meeting_name: e.meeting_name, ok: false, status: "failed", message: msg });
-            fillRun.failed.push({ meeting_id: e.meeting_id, meeting_name: e.meeting_name, message: msg });
-          }
+          logEntry(db, e, "ok", "tertulis");
+          fillRun.results.push({ student_id: e.student_id, meeting_id: e.meeting_id, meeting_name: e.meeting_name, ok: true, status: "ok", message: "tertulis" });
         } catch (er) {
-          const msg = String(er.message || er);
+          const msg = er?.response?.message || er?.message || `HTTP ${er?.status || "?"}`;
           logEntry(db, e, "failed", msg);
-          fillRun.results.push({ meeting_id: e.meeting_id, meeting_name: e.meeting_name, ok: false, status: "failed", message: msg });
-          fillRun.failed.push({ meeting_id: e.meeting_id, meeting_name: e.meeting_name, message: msg });
+          fillRun.results.push({ student_id: e.student_id, meeting_id: e.meeting_id, meeting_name: e.meeting_name, ok: false, status: "failed", message: msg });
+          fillRun.failed.push({ student_id: e.student_id, meeting_id: e.meeting_id, meeting_name: e.meeting_name, message: msg });
         }
         await sleep(REQUEST_DELAY);
       }

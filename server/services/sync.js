@@ -38,18 +38,15 @@ async function syncStudents(api) {
   for (const arr of pagesArr) {
     for (const o of arr) {
       if (!o || typeof o.id === "undefined") continue;
-      const id = Number(o.id);
-      if (!students.some((s) => s.id === id)) {
-        students.push({
-          id,
-          name: String(o.name ?? `Siswa #${id}`).slice(0, 200),
-          info:
-            o.code != null || o.total_sessions != null
-              ? `${o.code ?? ""} ${o.total_sessions != null ? "· " + o.total_sessions + " sesi" : ""}`.trim()
-              : "",
-          raw: o,
-        });
-      }
+      students.push({
+        id: Number(o.id),
+        name: String(o.name ?? `Siswa #${o.id}`).slice(0, 200),
+        info:
+          o.code != null || o.total_sessions != null
+            ? `${o.code ?? ""} ${o.total_sessions != null ? "· " + o.total_sessions + " sesi" : ""}`.trim()
+            : "",
+        raw: o,
+      });
     }
   }
 

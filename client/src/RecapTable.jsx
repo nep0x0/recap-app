@@ -193,10 +193,12 @@ export default function RecapTable({ rows, loading, running, state, onlyAtt, onO
     });
     const map = new Map();
     for (const r of filtered) {
-      if (!map.has(r.student_name)) map.set(r.student_name, []);
-      map.get(r.student_name).push(r);
+      // Key per student_id: dua siswa dengan nama sama tidak boleh tergabung.
+      if (!map.has(r.student_id)) map.set(r.student_id, { id: r.student_id, name: r.student_name, rows: [] });
+      map.get(r.student_id).rows.push(r);
     }
-    const arr = [...map.entries()].map(([name, rs]) => ({
+    const arr = [...map.values()].map(({ id, name, rows: rs }) => ({
+      id,
       name,
       rows: rs,
       last: Math.max(...rs.map((r) => (r.last_lesson_date ? Date.parse(r.last_lesson_date.slice(0, 10) + "T00:00:00") : 0))),
@@ -223,10 +225,10 @@ export default function RecapTable({ rows, loading, running, state, onlyAtt, onO
     setOpenCourses(n);
   };
 
-  const groupKey = (name) => {
+  const groupKey = (id) => {
     const n = new Set(openGroups);
-    if (n.has(name)) n.delete(name);
-    else n.add(name);
+    if (n.has(id)) n.delete(id);
+    else n.add(id);
     setOpenGroups(n);
   };
 
@@ -250,7 +252,7 @@ export default function RecapTable({ rows, loading, running, state, onlyAtt, onO
         r.total_progress ?? 0,
         `"${p}%"`,
         r.quiz_count ?? 0,
-        r.coins ?? 0,
+        r.coin_gained ?? 0,
         `"${r.last_lesson_date ? r.last_lesson_date.slice(0, 10) : "-"}"`,
       ];
       lines.push(row.join(","));
@@ -325,7 +327,7 @@ export default function RecapTable({ rows, loading, running, state, onlyAtt, onO
           <button
             type="button"
             className="quiet sm"
-            onClick={() => setOpenGroups(new Set(groups.map((g) => g.name)))}
+            onClick={() => setOpenGroups(new Set(groups.map((g) => g.id)))}
             disabled={!groups.length}
           >
             Buka semua
@@ -372,27 +374,27 @@ export default function RecapTable({ rows, loading, running, state, onlyAtt, onO
               </tbody>
             ) : (
               groups.map((g) => (
-                <tbody key={g.name}>
+                <tbody key={g.id}>
                   <tr
                     className="grp"
-                    data-name={g.name}
-                    onClick={() => groupKey(g.name)}
+                    data-name={g.id}
+                    onClick={() => groupKey(g.id)}
                     onKeyDown={grpKeys}
                     role="button"
                     tabIndex={0}
-                    aria-expanded={openGroups.has(g.name)}
+                    aria-expanded={openGroups.has(g.id)}
                   >
                     <td colSpan={7}>
                       <span className="avatar">{initials(g.name)}</span>
                       <span className="grp-name">{g.name}</span>
                       <span className="muted small">· {g.rows.length} course</span>
                       {g.att && <span className="chip warn">perlu perhatian</span>}
-                      <span className="chev">{openGroups.has(g.name) ? <IconChevronUp width={13} height={13} /> : <IconChevronDown width={13} height={13} />}</span>
+                      <span className="chev">{openGroups.has(g.id) ? <IconChevronUp width={13} height={13} /> : <IconChevronDown width={13} height={13} />}</span>
                     </td>
                   </tr>
-                  {openGroups.has(g.name) &&
+                  {openGroups.has(g.id) &&
                     g.rows.map((r) => {
-                      const k = `${g.name}::${r.course_name}`;
+                      const k = `${g.id}::${r.course_id ?? r.course_name}`;
                       return <CourseRow key={k} r={r} open={openCourses.has(k)} onToggle={() => toggleCourse(k)} />;
                     })}
                 </tbody>
@@ -418,14 +420,14 @@ export default function RecapTable({ rows, loading, running, state, onlyAtt, onO
           </div>
         ) : (
           groups.map((g) => (
-            <div key={`m-${g.name}`} className="mcard">
+            <div key={`m-${g.id}`} className="mcard">
               <div className="mcard-top">
                 <span className="avatar">{initials(g.name)}</span>
                 <b className="ellip">{g.name}</b>
                 {g.att && <span className="chip warn">perlu perhatian</span>}
               </div>
               {g.rows.map((r) => (
-                <div key={`mr-${g.name}-${r.course_id ?? r.course_name}`} className="mcourse">
+                <div key={`mr-${g.id}-${r.course_id ?? r.course_name}`} className="mcourse">
                   <div className="mcourse-head">
                     <span className="chip course">{r.course_name}</span>
                     <span className={`small ${needsAttention(r) ? "warn-text" : "muted"}`}>

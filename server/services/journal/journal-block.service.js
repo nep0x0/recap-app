@@ -1,4 +1,3 @@
-const { API_ORIGIN } = require("../../config");
 const { fetchJson } = require("../../lib/cms-client");
 const { sleep } = require("../../lib/utils");
 const {
@@ -91,32 +90,21 @@ async function ensureJournalsForBlock(api, opts) {
   const failed = [];
   for (const m of a.missing) {
     try {
-      const r = await fetch(
-        API_ORIGIN +
-          `/api/cms/student/${student_id}/learning-session/${session_id}/book/${book_id}/meeting-history/${m.id}/journal`,
+      await fetchJson(
+        `/api/cms/student/${student_id}/learning-session/${session_id}/book/${book_id}/meeting-history/${m.id}/journal`,
+        headers,
         {
           method: "POST",
-          headers: {
-            authorization: "Bearer " + headers.token,
-            "x-app-branch": headers.branch,
-            "x-app-timezone": headers.timezone,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+          body: {
             note: buildNote(a.student_name, m.lessons),
             learning_session_book_meeting_activities: m.lessons.map((l) => ({ id: l.id, score: computeScore(l) })),
-          }),
-          signal: AbortSignal.timeout(30000),
+          },
         }
       );
-      const body = await r.json().catch(() => null);
-      if (r.status >= 200 && r.status < 300) {
-        created.push({ meeting_id: m.id, meeting_name: m.name, lessons: m.lessons.length });
-      } else {
-        failed.push({ meeting_id: m.id, meeting_name: m.name, error: body?.message || `HTTP ${r.status}` });
-      }
+      created.push({ meeting_id: m.id, meeting_name: m.name, lessons: m.lessons.length });
     } catch (er) {
-      failed.push({ meeting_id: m.id, meeting_name: m.name, error: String(er.message || er) });
+      const msg = er?.response?.message || er?.message || `HTTP ${er?.status || "?"}`;
+      failed.push({ meeting_id: m.id, meeting_name: m.name, error: msg });
     }
     await sleep(REQUEST_DELAY);
   }

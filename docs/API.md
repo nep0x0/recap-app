@@ -30,7 +30,7 @@ Otomasi report & jurnal siswa Timedoor Academy. Server Express (`server/index.js
 | POST | `/api/journal/plan` | Susun draf jurnal (read-only CMS) | langsung | 4 |
 | POST | `/api/journal/fill` | Kirim jurnal ke CMS | **job** (poll `/api/journal/status`) | 4 |
 | GET | `/api/journal/status` | Status job fill | — | 4 |
-| GET | `/api/report/scan` | Pindai blok report semua siswa | **job** (poll `/api/report/scan-status`) | 5 |
+| POST | `/api/report/scan` | Pindai blok report semua siswa | **job** (poll `/api/report/scan-status`) | 5 |
 | GET | `/api/report/scan-status` | Status job scan | — | 5 |
 | GET | `/api/report/due` | Daftar blok belum beres + menunggu | langsung | 5 |
 | GET | `/api/report/done` | Daftar "Tandai Selesai" | langsung | 5 |
@@ -381,9 +381,11 @@ Ref: `server/index.js:136,145` · `journal.js:289` (`runFill`), `journal.js:26` 
 
 Model CMS: report dibuat per **book** (session-history) dan menutup **blok 8 lesson** (blok 8 = lesson 1–8, blok 16 = 9–16, dst.). Satu book bisa punya banyak report; nama report dibuat CMS dari rentang meeting ("Meeting 1 - Meeting 6"). Status report: `approved`, `waiting_approval`, dsb.
 
-Alur fitur UI: `GET /api/report/scan` → poll `scan-status` → baca `GET /api/report/due` → klik blok → `GET /api/report/preview` → isi skor 0–100 + catatan (kriteria live dari CMS, template narasi auto-fill) → `POST /api/report/create` → cek `GET /api/report/logs`. Book lama/beres bisa ditandai selesai via `/api/report/done`.
+Alur fitur UI: `POST /api/report/scan` → poll `scan-status` → baca `GET /api/report/due` → klik blok → `GET /api/report/preview` → isi skor 0–100 + catatan (kriteria live dari CMS, template narasi auto-fill) → `POST /api/report/create` → cek `GET /api/report/logs`. Book lama/beres bisa ditandai selesai via `/api/report/done`.
 
-### GET /api/report/scan
+### POST /api/report/scan
+
+> Sengaja **POST** (bukan GET): endpoint ini memulai job berat dengan efek samping. GET adalah *simple request* (tanpa preflight) sehingga bisa dipicu situs/HTML lain di LAN (CSRF via `<img src=…>`); POST dengan body JSON terlindung karena `express.json()` menolak body non-JSON lintas-origin.
 
 Job background: loop semua siswa → session → book. Book di `report_done` **dilewati tanpa menyentuh CMS**. Tiap book: max lesson (parse `Lesson N` dari aktivitas meeting), daftar jurnal, list report + detail tiap report (jurnal yang tercakup) → hitung:
 - `covered_blocks` — blok yang seluruh lesson-nya tercakup report existing
@@ -393,7 +395,7 @@ Durasi ±65 detik untuk 32 siswa (400 ms jeda antar request).
 
 **Respons 200:** `{ "started": true }` · `{ "started": false, "reason": "ALREADY_RUNNING" }`
 
-Ref: `server/index.js:149` · `report.js:98` (`runScan`).
+Ref: `server/routes/report.routes.js` (`POST /report/scan`) · `report-scan.service.js` (`runScan`).
 
 ---
 
@@ -663,7 +665,7 @@ Semua hasil (sukses/gagal) tercatat di `report_log` (lihat `/api/report/logs`). 
 
 ### POST /api/report/run · GET /api/report/run-status
 
-**Legacy** — alur lama (sekali jalan untuk satu siswa, semua book, semua kriteria skor 0). Sudah digantikan `/api/report/create`; dipertahankan untuk kompatibilitas, **tidak dipakai UI**.
+**Legacy** — alur lama (sekali jalan untuk satu siswa, semua book, semua kriteria skor 0). Sudah digantikan `/api/report/create`; dipertahankan untuk kompatibilitas, **tidak dipakai UI**. Jangan andalkan endpoint ini untuk fitur baru — riwayatnya tercatat dengan `block = 0` di `report_log`.
 
 **POST** body `{ "student_id": 60251 }` →
 - `200` `{ "started": true }` · `{ "started": false, "reason": "ALREADY_RUNNING" }`

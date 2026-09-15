@@ -11,12 +11,3 @@ export function SkelRows({ cols = 1, count = 5 }) {
     </tbody>
   );
 }
-
-export function SkelCard() {
-  return (
-    <div className="skel-card">
-      <div className="skel-line" style={{ width: "60%", height: 16, marginBottom: 8 }} />
-      <div className="skel-line" style={{ width: "40%", height: 12 }} />
-    </div>
-  );
-}

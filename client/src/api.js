@@ -22,7 +22,7 @@ export const api = {
   journalPlan: (studentId) => j("POST", "/api/journal/plan", { student_id: studentId }),
   journalFill: (entries) => j("POST", "/api/journal/fill", { entries }),
   journalStatus: () => j("GET", "/api/journal/status"),
-  reportScan: () => j("GET", "/api/report/scan"),
+  reportScan: () => j("POST", "/api/report/scan"),
   reportScanStatus: () => j("GET", "/api/report/scan-status"),
   reportDue: () => j("GET", "/api/report/due"),
   reportBooks: (studentId) => j("GET", `/api/report/books?student_id=${studentId}`),

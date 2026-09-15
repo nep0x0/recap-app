@@ -3,7 +3,9 @@ const reportController = require("../controllers/report.controller");
 
 const router = express.Router();
 
-router.get("/report/scan", reportController.runScan);
+// POST (bukan GET): scan memulai job berat dengan efek samping — GET mudah
+// dipicu lintas-origin (CSRF via <img>/prefetch) karena simple request.
+router.post("/report/scan", reportController.runScan);
 router.get("/report/scan-status", reportController.getScanStatus);
 router.get("/report/due", reportController.listDue);
 router.post("/report/run", reportController.runReport);

@@ -91,6 +91,11 @@ async function validateSession(ttlMs = 15000) {
       return true;
     }
   }
+  // "err" = gangguan jaringan/timeout, bukan berarti sesi batal: pertahankan
+  // hasil validasi terakhir agar UI tidak salah menampilkan halaman login.
+  if (status === "err" && validateOk !== null) {
+    return validateOk;
+  }
   validateOk = false;
   validateAt = now;
   if (readState().loggedIn) writeState({ loggedIn: false, lastCheckAt: Date.now() });

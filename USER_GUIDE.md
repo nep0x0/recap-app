@@ -80,7 +80,7 @@ Rekap menarik data progres setiap siswa dari CMS lalu menyimpannya sebagai snaps
 2. Klik **Mulai rekap semua siswa**.
 3. Proses berjalan di background. Pantau **progress bar** — tidak perlu refresh halaman.
 4. Kalau sudah selesai, buka tab **Ringkasan** untuk melihat hasilnya.
-5. Riwayat rekap ada di tab **Pengaturan** → bagian **Rekapan tersimpan**.
+5. Riwayat rekap tersimpan otomatis — data terbaru tinggal klik **Perbarui recap**.
 
 Yang akan diambil per siswa: lesson terakhir, mastery, coin, dsb.
 
@@ -141,7 +141,7 @@ Untuk book tertentu yang sudah kamu kerjakan manual di CMS tapi tidak terdeteksi
 
 ### 7.4 Riwayat
 
-Semua pembuatan report tercatat di bagian **Log report** di tab Report — bisa difilter per siswa.
+Semua pembuatan report tercatat di bagian **Riwayat** di tab Report — bisa difilter berdasarkan status (berhasil / skip / gagal).
 
 ---
 
@@ -151,8 +151,7 @@ Di tab **Pengaturan** kamu bisa:
 
 - 🔁 **Refresh login** — cek / perbarui sesi CMS tanpa login ulang.
 - 🚪 **Logout** — hapus sesi lokal. Kamu akan diminta login lagi di pemakaian berikutnya.
-- 🗑️ **Hapus data lokal** — reset cache siswa & log (tidak menghapus data di CMS).
-- 📜 Lihat **Riwayat rekap**, **Log jurnal**, **Log report** kapan saja.
+- 📜 **Log jurnal** ada di tab **Jurnal Meeting**; **Riwayat report** ada di tab **Report Siswa** (filter per status).
 
 Logout disarankan kalau kamu memakai komputer bersama.
 

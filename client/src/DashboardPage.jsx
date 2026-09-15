@@ -7,12 +7,17 @@ import { IconRefresh, IconAlert, IconCheck } from "./icons.jsx";
 function Stats({ rows, students, sessionValid, attActive, onToggleAtt }) {
   const groups = new Map();
   for (const r of rows) {
-    if (!groups.has(r.student_name)) groups.set(r.student_name, []);
-    groups.get(r.student_name).push(r);
+    if (!groups.has(r.student_id)) groups.set(r.student_id, { name: r.student_name, rows: [] });
+    groups.get(r.student_id).rows.push(r);
   }
-  const progs = rows.filter((r) => r.total_progress > 0);
-  const avg = progs.length ? Math.round(progs.reduce((a, r) => a + (r.latest_progress / r.total_progress) * 100, 0) / progs.length) : null;
-  const att = [...groups.values()].filter((rs) => rs.some(needsAttention));
+  const progs = rows.filter((r) => r.total_progress > 0 && r.latest_progress != null);
+  const avg =
+    progs.length
+      ? Math.round(
+          progs.reduce((a, r) => a + (r.latest_progress / r.total_progress) * 100, 0) / progs.length
+        )
+      : null;
+  const att = [...groups.values()].filter((g) => g.rows.some(needsAttention));
   const cards = [
     { label: "Siswa", value: sessionValid ? fmtNum(students) : "—", hint: "terdaftar di CMS" },
     { label: "Course diikuti", value: fmtNum(rows.length), hint: "course yang punya data" },

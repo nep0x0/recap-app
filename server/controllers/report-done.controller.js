@@ -42,7 +42,7 @@ function getLogs(_req, res) {
   try {
     const rows = getDb()
       .prepare(
-        `SELECT rl.student_id, s.name AS student_name, rl.session_id, rl.book_id, rl.course_name,
+        `SELECT rl.student_id, s.name AS student_name, rl.session_id, rl.book_id, rl.block, rl.course_name,
                 rl.report_id, rl.report_name, rl.status, rl.message, rl.created_at
          FROM report_log rl JOIN students s ON s.id = rl.student_id
          ORDER BY rl.created_at DESC LIMIT 500`

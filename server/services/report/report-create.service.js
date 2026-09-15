@@ -36,12 +36,12 @@ async function createBlockReport(api, studentId, bookId, block, criteriaInput) {
 
   const logRow = (status, message, extra) => {
     db.prepare(
-      `INSERT INTO report_log (student_id, session_id, book_id, course_name, report_id, report_name, status, message, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-       ON CONFLICT(student_id, session_id, book_id) DO UPDATE SET
+      `INSERT INTO report_log (student_id, session_id, book_id, block, course_name, report_id, report_name, status, message, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(student_id, session_id, book_id, block) DO UPDATE SET
          report_id = excluded.report_id, report_name = excluded.report_name,
          status = excluded.status, message = excluded.message, created_at = excluded.created_at`
-    ).run(sid, lsid, bid, courseName, extra?.report_id ?? null, extra?.report_name ?? null, status, message);
+    ).run(sid, lsid, bid, block, courseName, extra?.report_id ?? null, extra?.report_name ?? null, status, message);
   };
 
   try {

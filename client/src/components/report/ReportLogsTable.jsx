@@ -46,12 +46,13 @@ export default function ReportLogsTable({
               <tr>
                 <th>Siswa</th>
                 <th>Course</th>
+                <th>Blok</th>
                 <th>Status</th>
                 <th>Pesan</th>
                 <th className="hide-sm">Waktu</th>
               </tr>
             </thead>
-            <SkelRows cols={5} />
+            <SkelRows cols={6} />
           </table>
         </div>
       ) : viewLogs.length === 0 ? (
@@ -68,6 +69,7 @@ export default function ReportLogsTable({
                   <tr>
                     <th>Siswa</th>
                     <th>Course</th>
+                    <th>Blok</th>
                     <th>Status</th>
                     <th>Pesan</th>
                     <th className="hide-sm">Waktu</th>
@@ -75,11 +77,12 @@ export default function ReportLogsTable({
                 </thead>
                 <tbody>
                   {viewLogs.map((l) => (
-                    <tr key={`${l.student_id}-${l.book_id}-${l.created_at}`}>
+                    <tr key={`${l.student_id}-${l.book_id}-${l.block}-${l.created_at}`}>
                       <td className="now">{l.student_name}</td>
                       <td className="ellip" title={l.course_name}>
                         {l.course_name || "—"}
                       </td>
+                      <td className="mono now">{l.block ? `blok ${l.block}` : "—"}</td>
                       <td>
                         <StatusChip status={l.status} />
                       </td>
@@ -107,12 +110,15 @@ export default function ReportLogsTable({
 
           <div className="tbl-mobile">
             {viewLogs.map((l) => (
-              <div key={`m-${l.student_id}-${l.book_id}-${l.created_at}`} className="mcard">
+              <div key={`m-${l.student_id}-${l.book_id}-${l.block}-${l.created_at}`} className="mcard">
                 <div className="mcard-top">
                   <b className="ellip">{l.student_name}</b>
                   <StatusChip status={l.status} />
                 </div>
-                <div className="muted small ellip">{l.course_name || "—"}</div>
+                <div className="muted small ellip">
+                  {l.course_name || "—"}
+                  {l.block ? ` · blok ${l.block}` : ""}
+                </div>
                 <div className="small">{l.message}</div>
                 <div className="mcard-foot">
                   <span className="muted small now">{relDate(l.created_at.replace(" ", "T") + "Z")}</span>

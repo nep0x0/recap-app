@@ -29,10 +29,6 @@ function generateJournalEntries({ sorted, statuses, student, sid, bookId, histor
       });
       continue;
     }
-    if (i < startIdx) {
-      carried = [];
-      continue;
-    }
 
     const candidate = carried.concat(m.lessons);
     carried = [];

@@ -180,7 +180,9 @@ export default function App() {
   const handleRecap = async () => {
     setBusy(true);
     try {
-      const r = await api.recap();
+      // Rekap pertama (belum ada data): hanya siswa baru (cepat).
+      // "Perbarui recap" (sudah ada data): force=true agar semua siswa ditarik ulang.
+      const r = await api.recap(recapRows.length > 0);
       if (!r) return;
       setRecapRunning(true);
       setRecapState({ running: true, current: 0, total: 0 });

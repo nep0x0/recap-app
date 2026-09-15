@@ -9,11 +9,12 @@ async function createBookReport(student, session, book, headers, db) {
   const course = book?.book?.course || {};
   const courseName = course.name || session.name || "";
 
+  // Legacy whole-book create: block tidak diketahui → 0 (lihat docs/API.md §5, deprecated)
   const logRow = (status, message, extra) => {
     db.prepare(
-      `INSERT INTO report_log (student_id, session_id, book_id, course_name, report_id, report_name, status, message, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-       ON CONFLICT(student_id, session_id, book_id) DO UPDATE SET
+      `INSERT INTO report_log (student_id, session_id, book_id, block, course_name, report_id, report_name, status, message, created_at)
+       VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(student_id, session_id, book_id, block) DO UPDATE SET
          report_id = excluded.report_id, report_name = excluded.report_name,
          status = excluded.status, message = excluded.message, created_at = excluded.created_at`
     ).run(sid, lsid, bid, courseName, extra?.report_id ?? null, extra?.report_name ?? null, status, message);

@@ -172,7 +172,16 @@ function JournalPanel({ sessionValid, notify }) {
 
   const statusOf = (key) => {
     if (!fillState) return null;
-    return fillState.results.find((r) => r.meeting_id && String(r.meeting_id) === String(key.split("-").at(-1))) || null;
+    // key = `${student_id}-${session_id}-${meeting_id}`: cocokkan student+meeting
+    // sekaligus agar tidak salah pasang antar siswa.
+    const parts = String(key).split("-");
+    const studentId = Number(parts[0]);
+    const meetingId = parts[parts.length - 1];
+    return (
+      fillState.results.find(
+        (r) => r.student_id === studentId && String(r.meeting_id) === String(meetingId)
+      ) || null
+    );
   };
 
   const editEntry = useMemo(() => (plan ? plan.entries.find((e) => e.key === editKey) || null : null), [plan, editKey]);
@@ -196,10 +205,15 @@ function JournalPanel({ sessionValid, notify }) {
       const body = list.map((e) => ({
         ...e,
         note: notes[e.key] ?? e.note,
-        activities: (e.activities || []).map((a) => ({
-          ...a,
-          score: Number(scores[e.key]?.[a.id] ?? a.score ?? 85),
-        })),
+        activities: (e.activities || []).map((a) => {
+          // Input kosong/non-angka → kembali ke skor draf; selalu jepit 0–100
+          // (nilai ini ditulis ke CMS asli sebagai skor aktivitas siswa).
+          const raw = scores[e.key]?.[a.id];
+          const fallback = a.score ?? 85;
+          let score = raw === "" || raw == null ? fallback : Number(raw);
+          if (!Number.isFinite(score)) score = fallback;
+          return { ...a, score: Math.max(0, Math.min(100, Math.round(score))) };
+        }),
       }));
       const r = await api.journalFill(body);
       setConfirmBox(null);
