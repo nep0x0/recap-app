@@ -7,7 +7,9 @@ const {
   buildNote,
   lessonSorter,
   computeScore,
+  buildJournalFormData,
 } = require("./journal-helpers");
+
 const { fetchAllPages } = require("./journal-course-plan.service");
 
 
@@ -64,7 +66,7 @@ async function analyzeBlockJournals(api, { student_id, session_id, book_id, bloc
         `/api/cms/student/${student_id}/learning-session/${session_id}/book/${book_id}/meeting-history/${m.id}/journal`,
         headers
       );
-      exists = !!(r.data && r.data.id);
+      exists = !!(r.data && r.data.id && r.data.status === "created" && (r.data.evidence_photos || []).length > 0);
     } catch {}
     if (!exists) missing.push({ id: m.id, name: m.name, date: m.date, lessons: m.lessons });
   }
@@ -91,6 +93,14 @@ async function ensureJournalsForBlock(api, opts) {
   const failed = [];
   for (const m of a.missing) {
     try {
+      const noteText = buildNote(a.student_name, m.lessons);
+      const activities = m.lessons.map((l) => ({ id: l.id, score: computeScore(l) }));
+      const fd = buildJournalFormData({
+        note: noteText,
+        teacherNote: noteText,
+        activities,
+      });
+
       const r = await fetch(
         API_ORIGIN +
           `/api/cms/student/${student_id}/learning-session/${session_id}/book/${book_id}/meeting-history/${m.id}/journal`,
@@ -100,12 +110,8 @@ async function ensureJournalsForBlock(api, opts) {
             authorization: "Bearer " + headers.token,
             "x-app-branch": headers.branch,
             "x-app-timezone": headers.timezone,
-            "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            note: buildNote(a.student_name, m.lessons),
-            learning_session_book_meeting_activities: m.lessons.map((l) => ({ id: l.id, score: computeScore(l) })),
-          }),
+          body: fd,
           signal: AbortSignal.timeout(30000),
         }
       );
@@ -113,13 +119,17 @@ async function ensureJournalsForBlock(api, opts) {
       if (r.status >= 200 && r.status < 300) {
         created.push({ meeting_id: m.id, meeting_name: m.name, lessons: m.lessons.length });
       } else {
-        failed.push({ meeting_id: m.id, meeting_name: m.name, error: body?.message || `HTTP ${r.status}` });
+        const errMsg = body?.errors
+          ? Object.values(body.errors).flat().join(", ")
+          : (body?.message || `HTTP ${r.status}`);
+        failed.push({ meeting_id: m.id, meeting_name: m.name, error: errMsg });
       }
     } catch (er) {
       failed.push({ meeting_id: m.id, meeting_name: m.name, error: String(er.message || er) });
     }
     await sleep(REQUEST_DELAY);
   }
+
   return { ok: true, fillable: true, created, existing: [], failed };
 }
 

@@ -19,10 +19,36 @@ function computeScore(l) {
   return Math.max(70, Math.min((l.value ?? 0) + 10, 100));
 }
 
+const fs = require("fs");
+const { CODING_IMAGE_PATH } = require("../../config");
+
+function buildJournalFormData({ note, teacherNote, activities, imagePath = CODING_IMAGE_PATH }) {
+  const fd = new FormData();
+  fd.append("status", "created");
+  const noteText = String(note || "");
+  const teacherNoteText = String(teacherNote || noteText);
+  fd.append("note", noteText);
+  fd.append("teacher_note", teacherNoteText);
+  fd.append(
+    "learning_session_book_meeting_activities",
+    JSON.stringify(activities || [])
+  );
+
+  const targetPath = imagePath || CODING_IMAGE_PATH;
+  if (targetPath && fs.existsSync(targetPath)) {
+    const fileBuffer = fs.readFileSync(targetPath);
+    const blob = new Blob([fileBuffer], { type: "image/jpeg" });
+    fd.append("evidence_photos", blob, "Coding1.jpg");
+  }
+  return fd;
+}
+
 module.exports = {
   REPORT_STEP,
   parseLessonNum,
   buildNote,
   lessonSorter,
   computeScore,
+  buildJournalFormData,
 };
+

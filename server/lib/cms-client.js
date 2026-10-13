@@ -51,7 +51,12 @@ async function fetchJson(url, headers = {}, options = {}, retryCount = 0) {
 
   if (!res.ok) {
     const errorBody = await res.json().catch(() => null);
-    const msg = errorBody?.message || `HTTP ${res.status} ${res.statusText}`;
+    const validationDetails = errorBody?.errors
+      ? (typeof errorBody.errors === "object" ? Object.values(errorBody.errors).flat().join(", ") : String(errorBody.errors))
+      : null;
+    const msg = validationDetails
+      ? `${errorBody?.message || "Validation Error"}: ${validationDetails}`
+      : (errorBody?.message || `HTTP ${res.status} ${res.statusText}`);
     const err = new Error(msg);
     err.status = res.status;
     err.response = errorBody;

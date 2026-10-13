@@ -20,7 +20,7 @@ Panduan ini untuk **pengguna aplikasi** (guru / admin Timedoor Academy), bukan u
 
 ## 1. Persiapan pertama kali
 
-Pastikan **Node.js 18+** sudah terpasang, lalu minta teknisi untuk:
+Pastikan **Node.js ≥ 22.5.0** (Disarankan Node.js 22 LTS atau 24) sudah terpasang, lalu minta teknisi untuk:
 
 ```bash
 cd recap-app
@@ -92,56 +92,61 @@ Yang akan diambil per siswa: lesson terakhir, mastery, coin, dsb.
 
 Jurnal meeting adalah catatan yang dikirim ke CMS untuk siswa, berdasarkan data meeting di CMS.
 
-Alur dua langkah:
+Alur:
 
-### Langkah A — Susun draf
+### Langkah A — Susun draf & Penyesuaian
 
 1. Buka tab **Jurnal Meeting**.
-2. Pilih siswa (atau beberapa siswa).
-3. Klik **Susun draf**.
-4. Server mengambil data meeting dari CMS lalu menampilkan pratinjau. Periksa isinya.
+2. Pilih filter siswa (atau biarkan kosong untuk semua siswa).
+3. Klik **Buat rencana** / **Susun draf**.
+4. Server mengambil data meeting dari CMS lalu menyusun draf otomatis.
+5. **Edit Catatan & Nilai Lesson**:
+   - Klik salah satu baris pertemuan di daftar sebelah kiri.
+   - Di panel kanan, kamu dapat mengedit teks catatan jurnal.
+   - Kamu juga dapat menyesuaikan **Nilai Lesson** untuk tiap aktivitas di meeting tersebut (masukkan skor manual 0–100 atau gunakan tombol cepat **Set Semua: 80, 85, 90, 95, 100**).
+   - Perubahan tersimpan secara otomatis sebagai draf lokal (tombol *Kembalikan ke draf* tersedia jika ingin mereset).
 
 ### Langkah B — Kirim ke CMS
 
-1. Setelah pratinjau sesuai, klik **Kirim ke CMS**.
-2. Proses berjalan sebagai job background. Pantau status di tab yang sama.
-3. Setelah selesai, hasil & log tampil di halaman.
+1. Centang baris jurnal yang ingin dikirim (atau gunakan *Pilih semua*).
+2. Klik tombol **Isi N catatan ke CMS**.
+3. Konfirmasi di dialog modal.
+4. Proses berjalan di background. Pantau progress bar sampai selesai.
 
-Kalau ada error (mis. siswa tanpa data meeting), cek bagian **Log** di bawah halaman Jurnal.
+Kalau ada error (mis. sesi berakhir atau CMS down), hasil per baris akan ditandai dengan badge (tertulis, dilewati, atau gagal).
 
 ---
 
 ## 7. Report siswa (blok 8 pertemuan)
 
-Report dibuat per **blok 8 pertemuan**. Fitur ini membantu melengkapi blok yang belum beres.
+Report dibuat per **blok 8 pertemuan** (Blok 8 = Lesson 1–8, Blok 16 = Lesson 9–16, dst.). Fitur ini mendeteksi blok yang sudah memenuhi syarat tapi belum dibuatkan laporan.
 
 ### 7.1 Pindai blok yang belum selesai
 
 1. Buka tab **Report Siswa**.
-2. Klik **Pindai semua siswa** untuk memindai blok report.
-3. Tunggu sampai progress selesai.
-4. Setelah selesai, daftar **blok yang perlu dikerjakan** muncul di bagian **Due**.
+2. Klik **Pindai semua siswa** untuk memindai status seluruh blok di CMS.
+3. Tunggu sampai progress selesai (±1 menit untuk 30–50 siswa).
+4. Daftar blok yang belum dibuatkan laporan akan muncul di tabel **Due** (chip biru: siap dibuat; chip kuning: menunggu persetujuan).
 
 ### 7.2 Lihat & tandai selesai
 
-- Buka **Due** untuk daftar blok yang belum lengkap.
-- Buka **Selesai** untuk blok yang sudah ditandai selesai (status: ditandai manual oleh kamu).
+- Tab **Due**: Blok yang masih perlu tindakan / dibuatkan report.
+- Tab **Selesai**: Course yang sudah ditandai selesai (dilewati pemindaian agar tidak muncul lagi di Due).
+- Untuk menandai course yang sudah beres / tidak perlu report lagi: klik ikon centang / **Tandai selesai** di baris siswa. Tindakan ini bisa dibatalkan kapan saja dari tab **Selesai**.
 
-Untuk book tertentu yang sudah kamu kerjakan manual di CMS tapi tidak terdeteksi:
+### 7.3 Buat report baru (Modal Pembuatan Report)
 
-1. Cari siswa di **Daftar siswa** di bawah halaman Report.
-2. Klik **Tandai selesai** pada book yang dimaksud.
-3. Book pindah ke tab **Selesai**. Batalkan kapan saja dari tab yang sama.
+1. Pada blok di tabel **Due**, klik tombol **Buat blok N**.
+2. Modal pembuatan report akan terbuka dan memuat pratinjau:
+   - Menampilkan rentang lesson, jurnal yang tercakup, dan pengecekan tumpang-tindih (*overlap*).
+   - Bila ada meeting di rentang yang belum punya jurnal, sistem akan **mengisi jurnal otomatis** saat report dikirim.
+   - **Kriteria Penilaian**: Centang kriteria yang ingin disertakan. Isi skor (0–100) dan catatan (narasi otomatis terisi dari template CMS dengan nama siswa).
+   - Gunakan tombol cepat **Set Semua Skor (80, 85, 90, 95, 100)** di atas daftar kriteria untuk mengisi nilai semua kriteria sekaligus.
+3. Klik **Buat report blok N** untuk mengirim ke CMS.
 
-### 7.3 Buat report baru
+### 7.4 Riwayat Log
 
-1. Dari daftar **Due** atau **Selesai**, klik **Buat report** pada blok yang dimaksud.
-2. Tinjau **pratinjau** (kriteria, jurnal, cover) di panel kanan.
-3. Klik **Kirim ke CMS**.
-
-### 7.4 Riwayat
-
-Semua pembuatan report tercatat di bagian **Log report** di tab Report — bisa difilter per siswa.
+Semua hasil create report (berhasil atau gagal beserta pesan CMS) tercatat di tabel **Logs** pada tab Report.
 
 ---
 

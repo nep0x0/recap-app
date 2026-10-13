@@ -21,4 +21,6 @@ module.exports = {
   STATE_FILE,
   STORAGE_FILE,
   DB_PATH,
+  CODING_IMAGE_PATH: path.resolve(__dirname, "..", "Coding1.jpg"),
 };
+

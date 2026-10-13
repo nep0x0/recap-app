@@ -2,6 +2,8 @@ const { API_ORIGIN } = require("../../config");
 const { getDb } = require("../../db");
 const { fetchJson } = require("../../lib/cms-client");
 const { sleep } = require("../../lib/utils");
+const { buildJournalFormData } = require("./journal-helpers");
+
 
 const REQUEST_DELAY = 400;
 let fillRun = null;
@@ -49,8 +51,8 @@ function runFill(api, entries) {
         const url = `/api/cms/student/${e.student_id}/learning-session/${e.session_id}/book/${e.history_id}/meeting-history/${e.meeting_id}/journal`;
         try {
           const r = await fetchJson(url, headers);
-          if (r.data && r.data.id) {
-            const msg = "sudah ada, dilewati";
+          if (r.data && r.data.id && r.data.status === "created" && (r.data.evidence_photos || []).length > 0) {
+            const msg = "sudah ada (created), dilewati";
             logEntry(db, e, "skipped", msg);
             fillRun.results.push({ meeting_id: e.meeting_id, meeting_name: e.meeting_name, ok: false, status: "skipped", message: msg });
             continue;
@@ -58,21 +60,24 @@ function runFill(api, entries) {
         } catch {}
 
         try {
+          const activities = (e.activities || []).map((a) => ({
+            id: a.id,
+            score: typeof a.score === "number" ? a.score : parseInt(a.score, 10) || 85,
+          }));
+          const fd = buildJournalFormData({
+            note: e.note,
+            teacherNote: e.note,
+            activities,
+          });
+
           const r = await fetch(API_ORIGIN + url, {
             method: "POST",
             headers: {
               authorization: "Bearer " + headers.token,
               "x-app-branch": headers.branch,
               "x-app-timezone": headers.timezone,
-              "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              note: e.note,
-              learning_session_book_meeting_activities: (e.activities || []).map((a) => ({
-                id: a.id,
-                score: typeof a.score === "number" ? a.score : parseInt(a.score, 10) || 85,
-              })),
-            }),
+            body: fd,
             signal: AbortSignal.timeout(30000),
           });
           const body = await r.json().catch(() => null);
@@ -80,7 +85,10 @@ function runFill(api, entries) {
             logEntry(db, e, "ok", "tertulis");
             fillRun.results.push({ meeting_id: e.meeting_id, meeting_name: e.meeting_name, ok: true, status: "ok", message: "tertulis" });
           } else {
-            const msg = body?.message || `HTTP ${r.status}`;
+
+            const msg = body?.errors
+              ? Object.values(body.errors).flat().join(", ")
+              : (body?.message || `HTTP ${r.status}`);
             logEntry(db, e, "failed", msg);
             fillRun.results.push({ meeting_id: e.meeting_id, meeting_name: e.meeting_name, ok: false, status: "failed", message: msg });
             fillRun.failed.push({ meeting_id: e.meeting_id, meeting_name: e.meeting_name, message: msg });

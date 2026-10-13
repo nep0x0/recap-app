@@ -1,6 +1,6 @@
 # Dokumentasi API — RecapApp
 
-Otomasi report & jurnal siswa Timedoor Academy. Server Express (`server/index.js`) melayani **API JSON** di `/api/*` dan **SPA client** (`client/dist`) di `/`. Semua contoh respons di dokumen ini adalah **respons asli** yang ditangkap dari server berjalan (data nyata, 17-08-2026).
+Otomasi report & jurnal siswa Timedoor Academy. Server Express (`server/index.js` dengan router modular di `server/routes/`, controller di `server/controllers/`, service di `server/services/`, dan database di `server/db/`) melayani **API JSON** di `/api/*` dan **SPA client** (`client/dist`) di `/`. Semua contoh respons di dokumen ini adalah **respons asli** yang ditangkap dari server berjalan (data nyata, 17-08-2026).
 
 ## Konvensi umum
 
@@ -44,7 +44,7 @@ Otomasi report & jurnal siswa Timedoor Academy. Server Express (`server/index.js
 | GET | `/api/report/logs` | Riwayat create report | langsung | 5 |
 | GET | `/` `/*` | SPA (fallback `index.html`) | — | 6 |
 
-Referensi kode per endpoint dicantumkan di tiap bagian (route `server/index.js:baris` → layanan `server/services/*.js`).
+Referensi kode per endpoint dicantumkan di tiap bagian (route `server/routes/*.routes.js` → controller `server/controllers/*.controller.js` → layanan `server/services/*`).
 
 ---
 
@@ -74,7 +74,7 @@ Status sesi CMS & metadata sync. Memanggil `validateSession()` (memvalidasi toke
 | `sessionValid` | boolean | Token CMS masih valid saat dicek |
 | `loginEmail` | string / null | Email guru dari login terakhir; `null` setelah logout |
 
-Ref: `server/index.js:26` · `server/services/session.js` (`readState`, `validateSession`).
+Ref: `server/routes/auth.routes.js:6` · `server/controllers/auth.controller.js:3` (`getStatus`) · `server/services/session/` (`readState`, `validateSession`).
 
 ---
 
@@ -86,6 +86,7 @@ Login ke CMS Timedoor via API (`/api/tms/auth/login`), menyimpan `access_token`/
 ```json
 { "username": "guru@timedooracademy.com", "password": "rahasia" }
 ```
+*(Server juga menerima field alias `email` sebagai pengganti `username`)*
 
 **Respons:**
 - `200` → `{ "ok": true, "loggedIn": true }`
@@ -93,7 +94,7 @@ Login ke CMS Timedoor via API (`/api/tms/auth/login`), menyimpan `access_token`/
 - `401` → `{ "error": "Email atau password salah" }` (atau pesan dari CMS)
 - `500` → `{ "error": "Tidak bisa menghubungi server CMS. Periksa internet." }` dsb.
 
-Ref: `server/index.js:32` · `session.js:108` (`loginViaApi`).
+Ref: `server/routes/auth.routes.js:7` · `server/controllers/auth.controller.js:13` (`loginApi`) · `server/services/session/` (`loginViaApi`).
 
 ---
 
@@ -103,7 +104,7 @@ Validasi ulang sesi tanpa login ulang (dipakai app saat start / tombol refresh).
 
 **Respons 200:** `{ "loggedIn": true | false }`
 
-Ref: `server/index.js:47` · `session.js:135` (`validateSession`).
+Ref: `server/routes/auth.routes.js:8` · `server/controllers/auth.controller.js:30` (`refreshLogin`) · `server/services/session/` (`validateSession`).
 
 ---
 
@@ -113,7 +114,7 @@ Menghapus `storage.json` (token CMS) & menandai state tidak login. Tanpa body.
 
 **Respons 200:** `{ "ok": true }`
 
-Ref: `server/index.js:56` · `session.js:177` (`logout`).
+Ref: `server/routes/auth.routes.js:9` · `server/controllers/auth.controller.js:39` (`logout`) · `server/services/session/` (`logout`).
 
 ---
 
@@ -136,7 +137,7 @@ Menarik daftar semua siswa dari CMS (paginasi `/api/tms/student?limit=100`), ups
 | `pages` | Jumlah halaman paginasi CMS |
 | `method` | `"api"` (selalu; legacy browser disingkirkan) |
 
-Ref: `server/index.js:64` · `server/services/sync.js:61` (`syncStudents`).
+Ref: `server/routes/students.routes.js:6` · `server/controllers/students.controller.js:6` (`sync`) · `server/services/sync.js` (`syncStudents`).
 
 ---
 
@@ -170,7 +171,7 @@ Cari siswa (case-insensitive, `LIKE %q%`, maks 2000 baris). Setiap baris memuat 
 }
 ```
 
-Ref: `server/index.js:77` · `sync.js` (`getDb`).
+Ref: `server/routes/students.routes.js:7` · `server/controllers/students.controller.js:22` (`getStudents`) · `server/db/index.js` (`getDb`).
 
 ---
 
@@ -186,7 +187,7 @@ Job background: untuk tiap siswa **yang belum punya data** di tabel `recaps` (at
 - `{ "started": true }`
 - `{ "started": false, "reason": "ALREADY_RUNNING" }`
 
-`401` bila `NOT_LOGGED_IN`. Ref: `server/index.js:108` · `server/services/recap.js:155` (`runRecap`).
+Ref: `server/routes/recap.routes.js:6` · `server/controllers/recap.controller.js:4` (`startRecap`) · `server/services/recap/` (`runRecap`).
 
 ---
 
@@ -216,7 +217,7 @@ Status job recap terakhir/berjalan.
 | `failed` | `[{ id, name, error }]` |
 | `lastError` | Pesan error terakhir / `null` |
 
-Ref: `server/index.js:118` · `recap.js` (`getStatus`).
+Ref: `server/routes/recap.routes.js:7` · `server/controllers/recap.controller.js:14` (`getRecapStatus`) · `server/services/recap/` (`getStatus`).
 
 ---
 
@@ -270,7 +271,7 @@ Semua rekapan tersimpan (join tabel `recaps` + `students`), data mentah diringka
 | `quiz_count` / `quizzes` | `quizzes[i] = { score, attempt }` — `score` string hasil ekstrak dari attempt (`score`/`correct`/`total`) |
 | `meetings` | Urut tanggal terbaru dulu |
 
-Ref: `server/index.js:122` · `recap.js:213` (`listRecaps`), `recap.js:71` (`parseQuizzes`), `recap.js:81` (`scoreSummary`).
+Ref: `server/routes/recap.routes.js:8` · `server/controllers/recap.controller.js:22` (`listRecaps`) · `server/services/recap/` (`listRecaps`, `scoreSummary`).
 
 ---
 
@@ -291,7 +292,54 @@ Untuk tiap siswa (atau satu bila `student_id` diisi): ambil meeting-history + `a
   "student_count": 32,
   "course_count": 42,
   "entry_count": 193,
-  "skipped_count": 297,
+  "courses": [
+    {
+      "student_id": 60251,
+      "student_name": "Kiano Byan Azala",
+      "course_id": 6,
+      "course_name": "Coding Xplorer",
+      "total_lessons": 28,
+      "book_id": 197935,
+      "history_id": 197935,
+      "session_id": 62864,
+      "latest_progress": 28,
+      "total_progress": 28,
+      "entries": [
+        {
+          "key": "60251-62864-667061",
+          "student_id": 60251,
+          "student_name": "Kiano Byan Azala",
+          "session_id": 62864,
+          "book_id": 197935,
+          "history_id": 197935,
+          "course_id": 6,
+          "course_name": "Coding Xplorer",
+          "meeting_id": 667061,
+          "meeting_name": "Meeting 22",
+          "date": "2026-08-16",
+          "lessons": ["Lesson 28 - Calculator for Distance Apps"],
+          "note": "Kiano Byan Azala mempelajari Lesson 28 - Calculator for Distance Apps dengan baik.",
+          "activities": [
+            {
+              "id": 350016,
+              "name": "Lesson 28 - Calculator for Distance Apps",
+              "score": 100
+            }
+          ],
+          "exists": null
+        }
+      ],
+      "skipped": [
+        {
+          "meeting_id": 667060,
+          "meeting_name": "Meeting 21",
+          "date": "2026-08-13",
+          "reason": "exists",
+          "lessons": ["Lesson 27 - ..."]
+        }
+      ]
+    }
+  ],
   "entries": [
     {
       "key": "60251-62864-667061",
@@ -307,7 +355,13 @@ Untuk tiap siswa (atau satu bila `student_id` diisi): ambil meeting-history + `a
       "date": "2026-08-16",
       "lessons": ["Lesson 28 - Calculator for Distance Apps"],
       "note": "Kiano Byan Azala mempelajari Lesson 28 - Calculator for Distance Apps dengan baik.",
-      "activities": [{ "id": 350016, "score": 100 }],
+      "activities": [
+        {
+          "id": 350016,
+          "name": "Lesson 28 - Calculator for Distance Apps",
+          "score": 100
+        }
+      ],
       "exists": null
     }
   ],
@@ -323,6 +377,16 @@ Untuk tiap siswa (atau satu bila `student_id` diisi): ambil meeting-history + `a
 }
 ```
 
+| Field root | Tipe | Keterangan |
+|---|---|---|
+| `built_at` | string ISO | Waktu draf dibuat |
+| `student_count` | number | Jumlah siswa unik yang diproses |
+| `course_count` | number | Jumlah course/sesi yang diproses |
+| `entry_count` | number | Total draf entry yang siap diisi (`entries.length`) |
+| `courses` | array | Daftar per-course lengkap (`student_id`, `course_id`, `entries`, `skipped`, dll.) |
+| `entries` | array | Gabungan flattened dari seluruh draf entries yang siap dikirim |
+| `skipped` | array | Gabungan flattened dari seluruh meeting yang dilewati (jumlah = `skipped.length`) |
+
 | Field entry | Keterangan |
 |---|---|
 | `key` | `<student>-<session>-<meeting>` (id unik UI) |
@@ -330,29 +394,44 @@ Untuk tiap siswa (atau satu bila `student_id` diisi): ambil meeting-history + `a
 | `history_id` | `latest_learning_session_book_id` — dipakai sebagai `book` di URL CMS |
 | `course_id` | `course.id` (fallback `book_id`, lalu `session_id`) |
 | `lessons` | Konten lesson yang akan dicatat di meeting ini |
-| `note` | `${nama} mempelajari ${lesson} dengan baik.` |
-| `activities` | `{ id: activityId, score }` — skor: kelipatan 8 → `100`; aktivitas bernilai 0 → `86`; selainnya `max(70, min(value+10, 100))` |
+| `note` | `${nama} mempelajari ${lesson} dengan baik.` (dapat diedit di UI) |
+| `activities` | `[{ id, name, score }]` — `name` = judul lesson; `score`: kelipatan 8 → `100`; aktivitas bernilai 0 → `86`; selainnya `max(70, min(value+10, 100))` |
 | `exists` | `null` (legacy; sudah difilter) |
 
 `skipped.reason`: `exists` (jurnal sudah ada; `lessons` = yang belum tercatat di jurnal itu), `moved` (lesson dibawa ke meeting berikutnya karena melewati batas kelipatan 8), `empty` (tidak ada lesson yang ditulis).
 
-`401 NOT_LOGGED_IN` bila sesi CMS habis. Ref: `server/index.js:126` · `server/services/journal.js:235` (`buildPlan`), `journal.js:87` (`buildCoursePlan`).
+`401 NOT_LOGGED_IN` bila sesi CMS habis. Ref: `server/routes/journal.routes.js:6` · `server/controllers/journal.controller.js:4` (`planJournal`) · `server/services/journal/` (`buildPlan`, `buildCoursePlan`, `generateJournalEntries`).
 
 ---
 
 ### POST /api/journal/fill
 
-Job background: kirim draf entries ke CMS (`POST .../meeting-history/{meetingId}/journal` dengan body `{ note, learning_session_book_meeting_activities: [{ id, score }] }`). Meeting yang ternyata sudah punya jurnal → `skipped` (tanpa menulis). Hasil tercatat di tabel `journal_log`.
+Job background: kirim entries ke CMS (`POST .../meeting-history/{meetingId}/journal` secara multipart/form-data dengan `status: "created"`, `note`, `teacher_note`, `learning_session_book_meeting_activities`, dan file bukti foto `Coding1.jpg` pada `evidence_photos`). Meeting yang sudah berstatus `created` dan memiliki foto → `skipped`. Hasil tercatat di tabel `journal_log`.
 
 **Body:**
 ```json
 {
   "entries": [
-    { "student_id": 60251, "session_id": 62864, "history_id": 197935, "meeting_id": 667061,
-      "course_id": 6, "note": "…", "activities": [{ "id": 350016, "score": 100 }] }
+    {
+      "student_id": 60251,
+      "session_id": 62864,
+      "history_id": 197935,
+      "meeting_id": 667061,
+      "course_id": 6,
+      "note": "Kiano Byan Azala mempelajari Lesson 28 - Calculator for Distance Apps dengan baik.",
+      "activities": [
+        {
+          "id": 350016,
+          "name": "Lesson 28 - Calculator for Distance Apps",
+          "score": 100
+        }
+      ]
+    }
   ]
 }
 ```
+
+*Catatan:* `activities[].score` dikonversi ke integer oleh server (fallback 85 bila tidak valid). UI menyediakan quick set score (80, 85, 90, 95, 100) serta input manual per aktivitas.
 
 **Respons 200:**
 - `{ "started": true }`
@@ -373,7 +452,7 @@ Job background: kirim draf entries ke CMS (`POST .../meeting-history/{meetingId}
 
 `results[i]`: `{ "meeting_id", "meeting_name", "ok": true|false, "status": "ok"|"skipped"|"failed", "message" }` — `failed` berisi salinan hasil yang gagal `{ meeting_id, meeting_name, message }`.
 
-Ref: `server/index.js:136,145` · `journal.js:289` (`runFill`), `journal.js:26` (`getFillStatus`).
+Ref: `server/routes/journal.routes.js:7,8` · `server/controllers/journal.controller.js:14,23` (`fillJournal`, `getFillStatus`) · `server/services/journal/` (`runFill`, `getFillStatus`).
 
 ---
 
@@ -393,7 +472,7 @@ Durasi ±65 detik untuk 32 siswa (400 ms jeda antar request).
 
 **Respons 200:** `{ "started": true }` · `{ "started": false, "reason": "ALREADY_RUNNING" }`
 
-Ref: `server/index.js:149` · `report.js:98` (`runScan`).
+Ref: `server/routes/report.routes.js:6` · `server/controllers/report.controller.js:7` (`runScan`) · `server/services/report/` (`runScan`).
 
 ---
 
@@ -412,7 +491,7 @@ Ref: `server/index.js:149` · `report.js:98` (`runScan`).
 }
 ```
 
-`errors[i] = { id, name, error }` (per siswa gagal). `studentName` = siswa yang sedang diproses. Ref: `server/index.js:157` · `report.js:93` (`getScanStatus`).
+`errors[i] = { id, name, error }` (per siswa gagal). `studentName` = siswa yang sedang diproses. Ref: `server/routes/report.routes.js:7` · `server/controllers/report.controller.js:15` (`getScanStatus`) · `server/services/report/` (`getScanStatus`).
 
 ---
 
@@ -475,7 +554,7 @@ Book yang masih punya **blok belum beres** (dari scan terakhir). Berbeda dengan 
 | `due_blocks` | Label blok **tanpa report** → chip biru "buat blok N" |
 | `waiting_blocks` | Blok berstatus non-`approved` → chip kuning; klik → toast info, tidak bisa dikerjakan ulang |
 
-`block_status`/`block_info` dihitung saat scan; **`POST /api/report/create` yang sukses langsung mengupdatenya** (tanpa scan ulang). Ref: `server/index.js:161` · `report.js:230` (`listDue`), `report.js:250` (`blockLabels`).
+`block_status`/`block_info` dihitung saat scan; **`POST /api/report/create` yang sukses langsung mengupdatenya** (tanpa scan ulang). Ref: `server/routes/report.routes.js:8` · `server/controllers/report.controller.js:23` (`listDue`) · `server/services/report/` (`listDue`, `blockLabels`).
 
 ---
 
@@ -507,7 +586,7 @@ Book yang masih punya **blok belum beres** (dari scan terakhir). Berbeda dengan 
 
 **DELETE** body sama → `{ "ok": true }` (selalu berhasil, walau tidak ada baris).
 
-Ref: `server/index.js:225,233,247` · `report.js:258` (`listDone`), `report.js:272` (`markDone`), `report.js:282` (`unmarkDone`).
+Ref: `server/routes/report.routes.js:14-16` · `server/controllers/report-done.controller.js:6,14,28` (`listDone`, `markDone`, `unmarkDone`) · `server/services/report/` (`listDone`, `markDone`, `unmarkDone`).
 
 ---
 
@@ -539,7 +618,7 @@ Semua book (course) milik siswa dari hasil scan (kecuali yang ditandai selesai).
 }
 ```
 
-`400` `{ "error": "student_id wajib diisi" }` bila parameter hilang. Ref: `server/index.js:184` · `report.js:309` (`listBooks`).
+`400` `{ "error": "student_id wajib diisi" }` bila parameter hilang. Ref: `server/routes/report.routes.js:11` · `server/controllers/report.controller.js:49` (`listBooks`) · `server/services/report/` (`listBooks`).
 
 ---
 
@@ -614,7 +693,7 @@ Pratinjau blok sebelum create: jurnal meeting yang memuat lesson dalam rentang b
 - `"Course ini sudah ditandai selesai — batalkan di bagian 'Ditandai selesai' dulu"`
 - `"Sesi CMS berakhir — masuk ulang"`
 
-Ref: `server/index.js:194` · `report.js:340` (`previewBlock`), `report.js:578` (`fetchCourseCriteria`), `report.js:592` (`templateForBlock`), `journal.js:360` (`analyzeBlockJournals`).
+Ref: `server/routes/report.routes.js:12` · `server/controllers/report.controller.js:61` (`previewReport`) · `server/services/report/` (`previewBlock`, `fetchCourseCriteria`, `templateForBlock`) · `server/services/journal/` (`analyzeBlockJournals`).
 
 ---
 
@@ -657,7 +736,7 @@ Buat report satu blok ke CMS: validasi ulang (jurnal ada di rentang, tidak overl
 - `"Course ini sudah ditandai selesai — batalkan di bagian 'Ditandai selesai' dulu"`
 - `"Sesi CMS berakhir — masuk ulang"` · pesan error dari CMS (`resp.data.message`)
 
-Semua hasil (sukses/gagal) tercatat di `report_log` (lihat `/api/report/logs`). Ref: `server/index.js:209` · `report.js:411` (`createBlockReport`), `journal.js:425` (`ensureJournalsForBlock`).
+Semua hasil (sukses/gagal) tercatat di `report_log` (lihat `/api/report/logs`). Ref: `server/routes/report.routes.js:13` · `server/controllers/report.controller.js:76` (`createReport`) · `server/services/report/` (`createBlockReport`, `resolveBlockJournals`).
 
 ---
 
@@ -679,7 +758,7 @@ Semua hasil (sukses/gagal) tercatat di `report_log` (lihat `/api/report/logs`). 
 ```
 `results[i] = { book_id, course_name, ok, status: "ok"|"skipped"|"failed", message, report_id?, report_name? }`. Per book: report sudah ada → `skipped`; tidak ada jurnal → `failed`.
 
-Ref: `server/index.js:169,180` · `report.js:677` (`runReportForStudents`), `report.js:608` (`createBookReport`).
+Ref: `server/routes/report.routes.js:9,10` · `server/controllers/report.controller.js:31,41` (`runReport`, `getRunStatus`) · `server/services/report/` (`runReportForStudents`, `getRunStatus`, `createBookReport`).
 
 ---
 
@@ -707,7 +786,7 @@ Riwayat 500 percobaan create terbaru (tabel `report_log`).
 }
 ```
 
-`status`: `ok` / `skipped` / `failed`. Satu baris per `(student_id, session_id, book_id)` — percobaan terbaru menimpa yang lama. Ref: `server/index.js:260` · `report.js:39` (skema `report_log`).
+`status`: `ok` / `skipped` / `failed`. Satu baris per `(student_id, session_id, book_id)` — percobaan terbaru menimpa yang lama. Ref: `server/routes/report.routes.js:17` · `server/controllers/report-done.controller.js:41` (`getLogs`) · `server/db/index.js` (skema `report_log`).
 
 ---
 
@@ -719,13 +798,13 @@ Riwayat 500 percobaan create terbaru (tabel `report_log`).
 | `/assets/*` | Aset hasil build Vite |
 | `/*` (selain `/api/*`) | Fallback ke `index.html` (client routing) |
 
-Hanya disajikan bila `client/dist` ada (hasil `npm run build -w client`). Ref: `server/index.js:277`.
+Hanya disajikan bila `client/dist` ada (hasil `npm run build -w client`). Ref: `server/index.js:19-23`.
 
 ---
 
 ## 7. Skema DB (SQLite `server/data/recap.db`)
 
-DB lokal `node:sqlite` (`DatabaseSync`), dibuat otomatis saat service dipakai. Migrasi kolom baru memakai `ALTER TABLE ... ADD COLUMN` dalam `try/catch` (lihat `report.js:reportDb`).
+DB lokal `node:sqlite` (`DatabaseSync`), terpusat di `server/db/index.js`. Skema tabel dan migrasi kolom otomatis dijalankan saat server pertama memanggil `getDb()`.
 
 ### `students`
 | Kolom | Tipe | Keterangan |
@@ -819,6 +898,7 @@ Dipanggil server dengan header `Authorization: Bearer <token>`, `x-app-branch: [
 
 ## 9. Catatan teknis
 
+- **Arsitektur Modular**: Server mengorganisir kode dengan pola modular Express Router (`server/routes/*`), Controller (`server/controllers/*`), Service layer (`server/services/*`), Database terpusat (`server/db/index.js`), dan klien/helper CMS (`server/lib/*`).
 - **Jeda request CMS**: 400 ms (`REQUEST_DELAY`) — anti rate-limit.
 - **Tanpa browser**: seluruh request ke CMS memakai `fetch` HTTP murni dari Node; tidak ada Playwright/Chromium.
 - **Token**: dibaca dari `server/data/profile/storage.json` (cookies `access_token`/`refresh_token`); `validateSession()` punya cache 15 detik dan auto-refresh via `refresh_token` saat 401/403.
